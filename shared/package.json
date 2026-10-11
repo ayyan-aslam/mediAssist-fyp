@@ -1,0 +1,21 @@
+{
+  "name": "@mediassist/common",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "pino": "^10.4.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "express": "^5.3.0",
+    "supertest": "^7.3.1",
+    "vitest": "^5.0.3"
+  }
+}

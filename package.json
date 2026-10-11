@@ -1,0 +1,25 @@
+{
+  "name": "mediassist-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "shared",
+    "gateway",
+    "services/auth-service",
+    "services/consultation-service",
+    "services/prescription-service",
+    "services/notification-service",
+    "services/audit-service",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently --names gateway,auth --prefix-colors cyan,magenta \"npm run dev -w gateway\" \"npm run dev -w services/auth-service\""
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
+}

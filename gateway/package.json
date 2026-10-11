@@ -1,0 +1,24 @@
+{
+  "name": "@mediassist/gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=../.env src/server.js",
+    "dev": "node --watch --env-file-if-exists=../.env src/server.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mediassist/common": "^0.1.0",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "http-proxy-middleware": "^4.2.0",
+    "jose": "^6.2.12",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1",
+    "vitest": "^5.0.3"
+  }
+}

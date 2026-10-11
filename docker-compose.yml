@@ -1,0 +1,58 @@
+name: mediassist
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env}
+      # Read by docker/postgres/init.sql on the first start only.
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in .env}
+      DOCUMENT_DB_PASSWORD: ${DOCUMENT_DB_PASSWORD:?Set DOCUMENT_DB_PASSWORD in .env}
+      CHAT_DB_PASSWORD: ${CHAT_DB_PASSWORD:?Set CHAT_DB_PASSWORD in .env}
+      CONSULTATION_DB_PASSWORD: ${CONSULTATION_DB_PASSWORD:?Set CONSULTATION_DB_PASSWORD in .env}
+      SOAP_WORKER_DB_PASSWORD: ${SOAP_WORKER_DB_PASSWORD:?Set SOAP_WORKER_DB_PASSWORD in .env}
+      PRESCRIPTION_DB_PASSWORD: ${PRESCRIPTION_DB_PASSWORD:?Set PRESCRIPTION_DB_PASSWORD in .env}
+      MEDICINE_AI_DB_PASSWORD: ${MEDICINE_AI_DB_PASSWORD:?Set MEDICINE_AI_DB_PASSWORD in .env}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?Set NOTIFICATION_DB_PASSWORD in .env}
+      AUDIT_DB_PASSWORD: ${AUDIT_DB_PASSWORD:?Set AUDIT_DB_PASSWORD in .env}
+      AUDIT_OWNER_DB_PASSWORD: ${AUDIT_OWNER_DB_PASSWORD:?Set AUDIT_OWNER_DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Postgres 18+ images keep their data under /var/lib/postgresql/<version>.
+      - postgres-data:/var/lib/postgresql
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      # Uses TCP (-h 127.0.0.1), so it only passes after init.sql has finished.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    restart: unless-stopped
+    # A fixed hostname keeps the same RabbitMQ node name, so the data volume is reused.
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER in .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${RABBITMQ_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres-data:
+  rabbitmq-data:

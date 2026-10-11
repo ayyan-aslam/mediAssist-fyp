@@ -1,0 +1,78 @@
+// UserDB tables: design doc Section 4.4.1.
+// Check constraints (Section 4.6) are added as raw SQL in the migration, because Prisma cannot model them.
+// The indexes (Section 4.9) are listed here too, so later migrations do not drop them.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  userId        Int      @id @default(autoincrement()) @map("user_id")
+  firebaseUid   String   @unique @map("firebase_uid") @db.VarChar(128)
+  fullName      String   @map("full_name") @db.VarChar(100)
+  email         String   @unique @db.VarChar(150)
+  phone         String?  @unique @db.VarChar(15)
+  role          String   @db.VarChar(10)
+  accountStatus String   @default("active") @map("account_status") @db.VarChar(10)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  patientProfile PatientProfile?
+  doctorProfile  DoctorProfile?
+  refreshTokens  RefreshToken[]
+
+  @@index([fullName(ops: raw("gin_trgm_ops"))], type: Gin, map: "users_full_name_trgm_idx")
+  @@index([phone(ops: raw("gin_trgm_ops"))], type: Gin, map: "users_phone_trgm_idx")
+  @@map("users")
+}
+
+model PatientProfile {
+  userId      Int       @id @map("user_id")
+  dateOfBirth DateTime? @map("date_of_birth") @db.Date
+  gender      String?   @db.VarChar(10)
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("patient_profile")
+}
+
+model DoctorProfile {
+  userId         Int     @id @map("user_id")
+  cnicEncrypted  String  @map("cnic_encrypted") @db.VarChar(255)
+  cnicHash       String  @unique @map("cnic_hash") @db.Char(64)
+  registrationNo String  @unique @map("registration_no") @db.VarChar(30)
+  specialtyId    Int?    @map("specialty_id")
+
+  user      User       @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  specialty Specialty? @relation(fields: [specialtyId], references: [specialtyId])
+
+  @@index([specialtyId], map: "doctor_profile_specialty_id_idx")
+  @@map("doctor_profile")
+}
+
+model Specialty {
+  specialtyId Int    @id @default(autoincrement()) @map("specialty_id")
+  name        String @unique @db.VarChar(60)
+
+  doctorProfiles DoctorProfile[]
+
+  @@map("specialty")
+}
+
+model RefreshToken {
+  tokenId   Int      @id @default(autoincrement()) @map("token_id")
+  userId    Int      @map("user_id")
+  tokenHash String   @unique @map("token_hash") @db.Char(64)
+  expiresAt DateTime @map("expires_at") @db.Timestamp(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId], map: "refresh_token_user_id_idx")
+  @@index([expiresAt], map: "refresh_token_expires_at_idx")
+  @@map("refresh_token")
+}

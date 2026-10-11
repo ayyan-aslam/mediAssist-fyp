@@ -1,0 +1,45 @@
+# Environment files (keep only the example)
+.env
+.env.*
+!.env.example
+
+# Keys and service account files
+secrets/
+*service-account*.json
+*-firebase-adminsdk-*.json
+*.pem
+*.key
+*.p12
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Build output
+generated/
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Logs and OS files
+*.log
+.DS_Store
+Thumbs.db
+
+# Private docs and AI-assistant instructions (shared privately, not on GitHub)
+docs/
+README.md
+CLAUDE.md
+AGENTS.md
+.claude/
+
+# Editor settings
+.vscode/
+
+# TypeScript build cache
+*.tsbuildinfo
