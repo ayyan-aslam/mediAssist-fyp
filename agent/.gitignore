@@ -4,7 +4,6 @@ inbox/**/*
 !inbox/**/.gitkeep
 outbox/*
 !outbox/.gitkeep
-data/
 .venv/
 __pycache__/
 .env
