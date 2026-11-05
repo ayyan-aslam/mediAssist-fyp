@@ -1,0 +1,13 @@
+# Transcripts and SOAP outputs are patient data - never commit them.
+inbox/**/*
+!inbox/**/
+!inbox/**/.gitkeep
+outbox/*
+!outbox/.gitkeep
+data/
+.venv/
+__pycache__/
+.env
+
+# evaluation run outputs
+eval/results/

@@ -1,0 +1,14 @@
+Doctor: Good morning. What is the problem?
+Patient: Since last night I have loose motions, maybe eight or nine times, and I vomited twice this morning.
+Doctor: Any fever?
+Patient: No fever.
+Doctor: Any blood in the stool?
+Patient: No.
+Doctor: Did you eat outside yesterday?
+Patient: Yes, I had biryani from a roadside stall.
+Doctor: Okay, it looks like food poisoning. Your tongue is a bit dry, you are mildly dehydrated.
+Doctor: Take ORS, one sachet in one litre of water, drink it frequently through the day.
+Doctor: I am also giving you Flagyl 400 mg, one tablet three times a day for five days.
+Doctor: And Motilium 10 mg, one tablet before meals when you feel like vomiting, for three days.
+Doctor: If you see blood in the stool or the motions do not stop in two days, come back immediately.
+Patient: Okay doctor.

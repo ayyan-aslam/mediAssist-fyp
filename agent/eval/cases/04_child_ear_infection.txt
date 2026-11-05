@@ -1,0 +1,11 @@
+Doctor: What happened to the little one?
+Mother: Doctor, my son is four years old. He has had fever since two days and he keeps crying, holding his right ear.
+Doctor: Any rash or vomiting?
+Mother: No rash, no vomiting.
+Doctor: Is he allergic to any medicine?
+Mother: Not that we know.
+Doctor: His temperature is 102. The right eardrum is red and bulging. He has a middle ear infection.
+Doctor: Give him Augmentin suspension 312 mg, 5 ml twice a day for seven days.
+Doctor: And Calpol syrup, 5 ml three times a day when he has fever, for three days.
+Doctor: Bring him back if the fever continues after three days.
+Mother: Thank you, doctor.

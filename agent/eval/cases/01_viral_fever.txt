@@ -1,0 +1,18 @@
+[00:00:02] Doctor: Assalam o alaikum, please have a seat. What brings you in today?
+[00:00:06] Patient: Doctor, I have had fever for the last three days, and uh a bad headache.
+[00:00:12] Doctor: Any cough or sore throat?
+[00:00:14] Patient: Yes, a dry cough since yesterday. No sore throat.
+[00:00:19] Doctor: Any vomiting or loose motions?
+[00:00:21] Patient: No, nothing like that.
+[00:00:24] Doctor: Have you taken any medicine for this?
+[00:00:27] Patient: I took Panadol yesterday, two times. Also I am a diabetic for five years,
+I take Glucophage 500 twice a day.
+[00:00:36] Doctor: Okay. Any allergy to medicines?
+[00:00:38] Patient: Not that I know.
+[00:00:41] Doctor: Your temperature is 101 F. Throat looks slightly red. Chest is clear.
+[00:00:47] Doctor: It looks like a viral infection. I am prescribing Paracetamol 500 mg, one tablet three times a day after meals for five days.
+[00:00:55] Doctor: Should I also give you a cough syrup, Hydryllin?
+[00:00:58] Patient: No doctor, syrup makes me very sleepy, I have to go to work.
+[00:01:02] Doctor: Fine, no syrup. Drink plenty of fluids and rest. If the fever does not settle in three days we may need to start an antibiotic like Augmentin, and get a CBC done.
+[00:01:12] Doctor: Continue your Glucophage as before.
+[00:01:15] Patient: Okay doctor, thank you.

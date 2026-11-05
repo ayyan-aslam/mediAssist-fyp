@@ -1,0 +1,10 @@
+{
+  "description": "An uncertain symptom (maybe nausea) must not be listed as present",
+  "symptoms_present": [["abdominal pain", "abdominal cramps", "cramping", "lower abdominal pain", "belly pain", "abdominal cramping"]],
+  "symptoms_absent": [["nausea"], ["vomiting"], ["diarrhea", "diarrhoea", "loose motions"]],
+  "prescribed": [
+    {"name": "Buscopan", "aliases": ["hyoscine"], "strength": "10 mg", "dose": "1 tablet", "frequency": "three times a day", "status": "new"}
+  ],
+  "not_prescribed": [],
+  "history": []
+}

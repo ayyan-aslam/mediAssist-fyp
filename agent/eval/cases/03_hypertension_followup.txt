@@ -1,0 +1,10 @@
+Doctor: How is your blood pressure these days?
+Patient: Doctor, I am taking amlodipine 5 mg once a day for two years, but I still get occasional headaches.
+Patient: My knee also hurts, so I have been taking Brufen 400 every day for the last month.
+Doctor: Your BP today is 150 over 95, that is high.
+Doctor: Brufen every day can raise your blood pressure and hurt your stomach. Please stop the Brufen.
+Doctor: Increase your amlodipine to 10 mg once a day.
+Doctor: For the knee pain take Panadol 500 mg, two tablets when needed, not more than three times a day.
+Doctor: Get a kidney function test and come back in two weeks.
+Patient: Should I take anything else for the headache?
+Doctor: No, the headache should improve once the BP is controlled.

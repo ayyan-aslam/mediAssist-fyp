@@ -1,0 +1,55 @@
+{
+  "description": "Food poisoning; three medicines with full details; fever and blood denied",
+  "symptoms_present": [
+    [
+      "loose motions",
+      "diarrhea",
+      "diarrhoea"
+    ],
+    [
+      "vomiting"
+    ]
+  ],
+  "symptoms_absent": [
+    [
+      "fever"
+    ],
+    [
+      "blood in stool",
+      "bloody stool"
+    ]
+  ],
+  "prescribed": [
+    {
+      "name": "ORS",
+      "aliases": [
+        "oral rehydration salts",
+        "oral rehydration solution"
+      ],
+      "dose": "1 sachet"
+    },
+    {
+      "name": "Flagyl",
+      "aliases": [
+        "metronidazole"
+      ],
+      "strength": "400 mg",
+      "dose": "1 tablet",
+      "frequency": "three times a day",
+      "duration": "5 days",
+      "status": "new"
+    },
+    {
+      "name": "Motilium",
+      "aliases": [
+        "domperidone"
+      ],
+      "strength": "10 mg",
+      "dose": "1 tablet",
+      "duration": "3 days",
+      "status": "new"
+    }
+  ],
+  "not_prescribed": [],
+  "history": []
+}

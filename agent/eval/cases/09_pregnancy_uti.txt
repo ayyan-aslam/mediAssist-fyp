@@ -1,0 +1,12 @@
+Doctor: Please sit down. How many weeks pregnant are you now?
+Patient: Twenty weeks, doctor.
+Doctor: What is the problem today?
+Patient: Burning when I pass urine and I need to go very often, since two days.
+Doctor: Any fever or back pain?
+Patient: No fever, no back pain.
+Doctor: Your urine test shows an infection.
+Doctor: I will not give you ciprofloxacin because it is not safe in pregnancy.
+Doctor: Take Cefspan 400 mg, one capsule once a day for seven days.
+Doctor: Keep taking your folic acid as before.
+Doctor: Drink plenty of water.
+Patient: Okay doctor.
