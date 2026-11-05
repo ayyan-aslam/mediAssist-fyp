@@ -1,0 +1,11 @@
+{
+  "description": "Dose increase, new medicine, past medicine stopped for cost (history only)",
+  "symptoms_present": [["thirst", "polydipsia", "excessive thirst", "increased thirst"], ["frequent urination", "polyuria", "nocturia", "urination at night"]],
+  "symptoms_absent": [],
+  "prescribed": [
+    {"name": "Glucophage", "aliases": ["metformin"], "strength": "1000 mg", "frequency": "twice a day"},
+    {"name": "Getryl", "aliases": ["glimepiride"], "strength": "1 mg", "dose": "1 tablet", "frequency": "once a day", "status": "new"}
+  ],
+  "not_prescribed": ["Januvia"],
+  "history": [{"medicine": "Januvia"}, {"medicine": "Glucophage", "condition": "diabetes"}]
+}

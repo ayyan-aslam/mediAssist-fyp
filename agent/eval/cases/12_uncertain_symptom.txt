@@ -1,0 +1,9 @@
+Doctor: What is the trouble?
+Patient: I have cramping pain in my lower belly since this morning.
+Doctor: Any nausea?
+Patient: Maybe a little, I am not sure.
+Doctor: Any vomiting or loose motions?
+Patient: No.
+Doctor: The abdomen is soft, mild tenderness. It is likely intestinal spasm.
+Doctor: Take Buscopan 10 mg, one tablet three times a day when you have pain.
+Patient: Okay.

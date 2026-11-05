@@ -1,0 +1,10 @@
+{
+  "description": "Duration said in words ('a week'); the agent must not invent '7 days' or a dose that was never said",
+  "symptoms_present": [["sore throat"], ["fever"], ["painful swallowing", "odynophagia", "pain on swallowing", "difficulty swallowing"]],
+  "symptoms_absent": [],
+  "prescribed": [
+    {"name": "amoxicillin", "strength": "500 mg", "frequency": "three times a day", "duration": "a week", "dose": null, "status": "new"}
+  ],
+  "not_prescribed": [],
+  "history": []
+}

@@ -1,0 +1,8 @@
+Doctor: What seems to be the problem?
+Patient: Constant sneezing and runny nose, and my eyes are itchy. It happens every spring.
+Doctor: Any fever or body aches?
+Patient: No.
+Doctor: This is allergic rhinitis. Take Rigix 10 mg, one tablet at night for ten days.
+Doctor: If it does not help we can try a nasal spray like Avamys next time.
+Doctor: Try to avoid going out on windy days.
+Patient: Okay.

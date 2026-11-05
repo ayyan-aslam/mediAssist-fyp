@@ -1,0 +1,11 @@
+{
+  "description": "Fever/headache/dry cough; paracetamol prescribed; syrup declined; Augmentin hypothetical; continue Glucophage",
+  "symptoms_present": [["fever"], ["headache", "head ache"], ["dry cough", "cough"]],
+  "symptoms_absent": [["vomiting"], ["diarrhea", "diarrhoea", "loose motions"], ["sore throat"]],
+  "prescribed": [
+    {"name": "Paracetamol", "strength": "500 mg", "dose": "1 tablet", "frequency": "three times a day", "duration": "5 days", "status": "new"},
+    {"name": "Glucophage", "aliases": ["metformin"], "strength": "500", "frequency": "twice a day", "dose": null, "status": "continued"}
+  ],
+  "not_prescribed": ["Hydryllin", "Augmentin", "Panadol"],
+  "history": [{"medicine": "Glucophage", "condition": "diabetes"}, {"medicine": "Panadol"}]
+}

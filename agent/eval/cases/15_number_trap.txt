@@ -1,0 +1,8 @@
+Doctor: What is the problem?
+Patient: Sore throat and fever since three days. It hurts to swallow.
+Doctor: Your tonsils are swollen with white patches. This is tonsillitis.
+Doctor: Take amoxicillin 500 mg three times a day.
+Patient: For how many days?
+Doctor: For a week. Complete the full course.
+Doctor: You can gargle with warm salt water.
+Patient: Thank you.
