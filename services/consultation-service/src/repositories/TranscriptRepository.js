@@ -14,6 +14,23 @@ export class TranscriptRepository {
     return count === 1;
   }
 
+  findWindow(consultationId, windowNo) {
+    return this.prisma.transcriptWindow.findUnique({
+      where: { consultationId_windowNo: { consultationId, windowNo } },
+    });
+  }
+
+  saveText(consultationId, windowNo, transcriptText) {
+    return this.prisma.transcriptWindow.updateMany({
+      where: { consultationId, windowNo },
+      data: { transcriptText, status: 'done' },
+    });
+  }
+
+  updateStatus(consultationId, windowNo, status) {
+    return this.prisma.transcriptWindow.updateMany({ where: { consultationId, windowNo }, data: { status } });
+  }
+
   deleteWindow(consultationId, windowNo) {
     return this.prisma.transcriptWindow.deleteMany({ where: { consultationId, windowNo } });
   }

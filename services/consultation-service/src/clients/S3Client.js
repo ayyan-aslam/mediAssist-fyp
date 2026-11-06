@@ -1,6 +1,6 @@
-import { PutObjectCommand, S3Client as AwsS3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client as AwsS3Client } from '@aws-sdk/client-s3';
 
-// Saves files in the Amazon S3 bucket, encrypted with AES-256. Kept small, so tests can replace it.
+// Saves and reads files in the Amazon S3 bucket, encrypted with AES-256. Kept small, so tests can replace it.
 export class S3Client {
   constructor({ region, accessKeyId, secretAccessKey, bucket }) {
     this.bucket = bucket;
@@ -19,5 +19,11 @@ export class S3Client {
       }),
     );
     return key;
+  }
+
+  // Returns the file as a Buffer.
+  async download(key) {
+    const result = await this.s3.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    return Buffer.from(await result.Body.transformToByteArray());
   }
 }

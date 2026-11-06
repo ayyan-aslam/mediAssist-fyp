@@ -2,8 +2,8 @@
 # needs the shared package and the root package-lock.json.
 FROM node:24-slim
 
-# OpenSSL for the Prisma schema engine (prisma migrate deploy).
-RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
+# OpenSSL for the Prisma schema engine (prisma migrate deploy). ffmpeg joins the audio parts of each minute.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ffmpeg && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

@@ -7,18 +7,16 @@
 //
 // Needs ffmpeg and ffprobe on the PATH. Results folder default: <audio folder>/results.
 import { execFile } from 'node:child_process';
-import { createReadStream } from 'node:fs';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { loadConfig } from '@mediassist/common';
-import OpenAI from 'openai';
 import { z } from 'zod';
+import { loadPrompt, OpenAIClient } from '../src/clients/OpenAIClient.js';
+import { speechPrompt } from '../src/services/TranscriptionService.js';
 
 const run = promisify(execFile);
-const promptsDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'prompts');
 
 const MINUTE_SECONDS = 60;
 const OVERLAP_SECONDS = 10;
@@ -33,7 +31,14 @@ const config = loadConfig(
   }),
 );
 
-const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY, timeout: config.OPENAI_TIMEOUT_SEC * 1000 });
+// The same client and prompts as the service (prompts/transcript-cleanup.md, prompts/transcription-context.md).
+const openai = new OpenAIClient({
+  apiKey: config.OPENAI_API_KEY,
+  transcribeModel: config.OPENAI_TRANSCRIBE_MODEL,
+  cleanupModel: config.OPENAI_CLEANUP_MODEL,
+  timeoutSec: config.OPENAI_TIMEOUT_SEC,
+  cleanupPrompt: await loadPrompt('transcript-cleanup.md'),
+});
 
 async function durationSeconds(file) {
   const { stdout } = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file]);
@@ -52,44 +57,13 @@ async function cutPiece(file, minute, out) {
   ]);
 }
 
-// The speech-to-text prompt may not contain line breaks, "<" or ">".
-function speechPrompt(previousText, note) {
-  return `${previousText} ${note}`.replace(/[\r\n<>]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
 async function timed(fn) {
   const started = performance.now();
   const result = await fn();
   return { result, seconds: ((performance.now() - started) / 1000).toFixed(1) };
 }
 
-async function transcribe(piece, prompt) {
-  const transcription = await openai.audio.transcriptions.create({
-    file: createReadStream(piece),
-    model: config.OPENAI_TRANSCRIBE_MODEL,
-    prompt,
-  });
-  return transcription.text.trim();
-}
-
-async function cleanUp(systemPrompt, previousText, rawText) {
-  const completion = await openai.chat.completions.create({
-    model: config.OPENAI_CLEANUP_MODEL,
-    temperature: 0,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      {
-        role: 'user',
-        content:
-          `<previous_minute>\n${previousText || '(none, this is the first minute)'}\n</previous_minute>\n\n` +
-          `<new_raw_text>\n${rawText}\n</new_raw_text>`,
-      },
-    ],
-  });
-  return completion.choices[0].message.content.trim();
-}
-
-async function testFile(file, resultsDir, prompts, workDir) {
+async function testFile(file, resultsDir, context, workDir) {
   // The format is part of the name, so a.mp3 and a.webm do not overwrite each other's results.
   const { name: base, ext } = path.parse(file);
   const name = `${base}-${ext.slice(1).toLowerCase()}`;
@@ -99,8 +73,9 @@ async function testFile(file, resultsDir, prompts, workDir) {
     const piece = path.join(workDir, `${name}-minute${minute + 1}.mp3`);
     await cutPiece(file, minute, piece);
 
-    const raw = await timed(() => transcribe(piece, speechPrompt(previousText, prompts.context)));
-    const clean = await timed(() => cleanUp(prompts.cleanup, previousText, raw.result));
+    const audio = await readFile(piece);
+    const raw = await timed(() => openai.transcribe(audio, speechPrompt(previousText, context)));
+    const clean = await timed(() => openai.cleanUp(previousText, raw.result));
 
     const out = path.join(resultsDir, `${name}-minute${minute + 1}`);
     await writeFile(`${out}.raw.txt`, `${raw.result}\n`, 'utf8');
@@ -119,10 +94,7 @@ async function main() {
   const resultsDir = resultsArg ?? path.join(audioDir, 'results');
   await mkdir(resultsDir, { recursive: true });
 
-  const prompts = {
-    context: (await readFile(path.join(promptsDir, 'transcription-context.md'), 'utf8')).trim(),
-    cleanup: (await readFile(path.join(promptsDir, 'transcript-cleanup.md'), 'utf8')).trim(),
-  };
+  const context = await loadPrompt('transcription-context.md');
   const files = (await readdir(audioDir, { withFileTypes: true }))
     .filter((entry) => entry.isFile() && AUDIO_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
     .map((entry) => path.join(audioDir, entry.name))
@@ -135,7 +107,7 @@ async function main() {
   const workDir = await mkdtemp(path.join(tmpdir(), 'test-transcription-'));
   try {
     for (const file of files) {
-      await testFile(file, resultsDir, prompts, workDir);
+      await testFile(file, resultsDir, context, workDir);
     }
     console.log(`Results in ${resultsDir}`);
   } finally {
