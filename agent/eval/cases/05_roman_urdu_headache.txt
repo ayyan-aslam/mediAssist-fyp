@@ -1,0 +1,10 @@
+Doctor: Assalam o alaikum. Kya taklif hai?
+Patient: Doctor sahab, sir mein bahut dard hai aur chakkar aate hain, teen din se.
+Doctor: Ulti ya bukhar?
+Patient: Nahi, ulti nahi hai, bukhar bhi nahi.
+Doctor: Neend poori hoti hai?
+Patient: Nahi, kaam ki wajah se raat ko der se sota hoon.
+Doctor: BP normal hai, 120 over 80. Yeh tension headache lagta hai.
+Doctor: Panadol 500 mg, ek tablet din mein teen dafa, teen din ke liye.
+Doctor: Aur neend poori karein, paani zyada piyen.
+Patient: Theek hai doctor sahab.

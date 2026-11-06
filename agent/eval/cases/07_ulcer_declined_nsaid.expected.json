@@ -1,0 +1,10 @@
+{
+  "description": "Doctor withdraws an NSAID because of ulcer history; past condition with no medicine",
+  "symptoms_present": [["ankle pain", "pain"], ["ankle swelling", "swelling", "swollen"]],
+  "symptoms_absent": [],
+  "prescribed": [
+    {"name": "Panadol", "aliases": ["paracetamol"], "strength": "500 mg", "dose": "2 tablets", "frequency": "three times a day", "duration": "3 days", "status": "new"}
+  ],
+  "not_prescribed": ["Brufen"],
+  "history": [{"condition": "stomach ulcer"}]
+}

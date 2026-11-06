@@ -1,0 +1,8 @@
+Doctor: Your sugar report is high, fasting is 190.
+Patient: Yes doctor, I feel very thirsty and I go to the toilet many times at night.
+Doctor: Which medicines are you taking?
+Patient: Glucophage 500 twice a day. Last year I was also on Januvia but I stopped it because it was too expensive.
+Doctor: Okay. Increase Glucophage to 1000 mg twice a day after meals.
+Doctor: I am adding Getryl 1 mg, one tablet once a day before breakfast.
+Doctor: Check your sugar at home and come back in one month with your readings.
+Patient: Fine.

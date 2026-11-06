@@ -1,0 +1,9 @@
+Doctor: What brings you here?
+Patient: I twisted my ankle yesterday while playing football. It is swollen and painful.
+Doctor: Can you walk on it?
+Patient: Yes, but it hurts.
+Doctor: There is mild swelling, no deformity. It is a sprain. I could give you Brufen for the pain.
+Patient: Doctor, I had a stomach ulcer three years ago, I was told to avoid such medicines.
+Doctor: Good that you told me. Then no Brufen. Take Panadol 500 mg, two tablets three times a day for three days.
+Doctor: Apply ice for fifteen minutes four times a day and keep the foot raised.
+Patient: Thank you.

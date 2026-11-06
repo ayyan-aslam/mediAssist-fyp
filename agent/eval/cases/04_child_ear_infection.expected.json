@@ -1,0 +1,11 @@
+{
+  "description": "Paediatric case; mother speaks for the child; two syrups with ml doses",
+  "symptoms_present": [["fever"], ["ear pain", "earache", "ear ache"]],
+  "symptoms_absent": [["rash"], ["vomiting"]],
+  "prescribed": [
+    {"name": "Augmentin", "aliases": ["co-amoxiclav", "amoxicillin clavulanate"], "strength": "312 mg", "dose": "5 ml", "frequency": "twice a day", "duration": "7 days", "status": "new"},
+    {"name": "Calpol", "aliases": ["paracetamol"], "dose": "5 ml", "frequency": "three times a day", "duration": "3 days", "status": "new"}
+  ],
+  "not_prescribed": [],
+  "history": []
+}

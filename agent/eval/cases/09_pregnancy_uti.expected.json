@@ -1,0 +1,11 @@
+{
+  "description": "Pregnant patient; unsafe drug explicitly refused; continued folic acid",
+  "symptoms_present": [["burning urination", "dysuria", "burning micturition", "burning when passing urine", "burning"], ["frequent urination", "frequency", "urinary frequency"]],
+  "symptoms_absent": [["fever"], ["back pain"]],
+  "prescribed": [
+    {"name": "Cefspan", "aliases": ["cefixime"], "strength": "400 mg", "dose": "1 capsule", "frequency": "once a day", "duration": "7 days", "status": "new"},
+    {"name": "folic acid", "status": "continued"}
+  ],
+  "not_prescribed": ["ciprofloxacin"],
+  "history": [{"medicine": "folic acid"}]
+}

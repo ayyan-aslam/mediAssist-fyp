@@ -1,0 +1,11 @@
+{
+  "description": "Topical + oral prescription",
+  "symptoms_present": [["rash", "skin rash"], ["itching", "itchy", "pruritus"], ["oozing", "discharge"]],
+  "symptoms_absent": [["fever"]],
+  "prescribed": [
+    {"name": "Fucicort", "aliases": ["fusidic acid betamethasone"], "frequency": "twice a day", "duration": "7 days", "status": "new"},
+    {"name": "Rigix", "aliases": ["cetirizine"], "strength": "10 mg", "dose": "1 tablet", "frequency": "at night", "duration": "5 days", "status": "new"}
+  ],
+  "not_prescribed": [],
+  "history": []
+}
