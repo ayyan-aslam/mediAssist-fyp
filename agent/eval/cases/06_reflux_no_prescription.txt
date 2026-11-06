@@ -1,0 +1,10 @@
+Doctor: Tell me what is bothering you.
+Patient: I get a burning feeling in my chest after dinner, especially when I lie down.
+Doctor: How long has this been happening?
+Patient: About a month.
+Doctor: Any difficulty swallowing or weight loss?
+Patient: No.
+Doctor: This sounds like acid reflux. Some people need omeprazole for this, but in your case I don't think you need any medicine right now.
+Doctor: Eat dinner at least three hours before sleeping, avoid spicy and oily food, and raise the head of your bed.
+Doctor: If it does not improve in four weeks, come back and we will discuss medicine.
+Patient: Okay, I will try that.

@@ -1,0 +1,47 @@
+{
+  "description": "Continued reliever + new controller inhaler with long duration (wheezing is an exam finding, not a reported symptom)",
+  "symptoms_present": [
+    [
+      "cough",
+      "nocturnal cough",
+      "night cough"
+    ],
+    [
+      "chest tightness",
+      "tight chest"
+    ]
+  ],
+  "symptoms_absent": [
+    [
+      "fever"
+    ]
+  ],
+  "prescribed": [
+    {
+      "name": "Ventolin",
+      "aliases": [
+        "salbutamol"
+      ],
+      "dose": "2 puffs",
+      "status": "continued"
+    },
+    {
+      "name": "Seretide",
+      "aliases": [
+        "fluticasone salmeterol",
+        "salmeterol fluticasone"
+      ],
+      "strength": "250",
+      "dose": "1 puff",
+      "frequency": "twice a day",
+      "duration": "3 months",
+      "status": "new"
+    }
+  ],
+  "not_prescribed": [],
+  "history": [
+    {
+      "condition": "asthma"
+    }
+  ]
+}

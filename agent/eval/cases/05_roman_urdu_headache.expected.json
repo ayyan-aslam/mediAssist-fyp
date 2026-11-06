@@ -1,0 +1,10 @@
+{
+  "description": "Roman Urdu consultation; numbers spoken in Urdu (ek, teen dafa)",
+  "symptoms_present": [["headache", "sir dard", "head pain"], ["dizziness", "chakkar", "vertigo"], ["insomnia", "poor sleep", "sleep", "neend"]],
+  "symptoms_absent": [["vomiting", "ulti"], ["fever", "bukhar"]],
+  "prescribed": [
+    {"name": "Panadol", "aliases": ["paracetamol"], "strength": "500 mg", "dose": "1 tablet", "frequency": "three times a day", "duration": "3 days", "status": "new"}
+  ],
+  "not_prescribed": [],
+  "history": []
+}

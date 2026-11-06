@@ -1,0 +1,10 @@
+{
+  "description": "One prescription; a 'maybe next time' nasal spray must not be prescribed",
+  "symptoms_present": [["sneezing"], ["runny nose", "rhinorrhea", "rhinorrhoea"], ["itchy eyes", "eye itching"]],
+  "symptoms_absent": [["fever"], ["body aches", "body ache"]],
+  "prescribed": [
+    {"name": "Rigix", "aliases": ["cetirizine"], "strength": "10 mg", "dose": "1 tablet", "frequency": "at night", "duration": "10 days", "status": "new"}
+  ],
+  "not_prescribed": ["Avamys"],
+  "history": []
+}

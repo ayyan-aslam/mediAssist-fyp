@@ -1,0 +1,8 @@
+{
+  "description": "Counselling only - a medicine is discussed but deliberately NOT prescribed",
+  "symptoms_present": [["heartburn", "burning chest", "chest burning", "acid reflux", "burning sensation in chest"]],
+  "symptoms_absent": [["dysphagia", "difficulty swallowing"], ["weight loss"]],
+  "prescribed": [],
+  "not_prescribed": ["omeprazole"],
+  "history": []
+}

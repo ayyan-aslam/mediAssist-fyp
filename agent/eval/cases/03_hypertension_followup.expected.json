@@ -1,0 +1,11 @@
+{
+  "description": "Dose increase (amlodipine), stopped medicine (Brufen), new as-needed Panadol",
+  "symptoms_present": [["headache", "headaches"], ["knee pain"]],
+  "symptoms_absent": [],
+  "prescribed": [
+    {"name": "Amlodipine", "strength": "10 mg", "frequency": "once a day"},
+    {"name": "Panadol", "aliases": ["paracetamol"], "strength": "500 mg", "dose": "2 tablets", "status": "new"}
+  ],
+  "not_prescribed": ["Brufen"],
+  "history": [{"medicine": "amlodipine", "condition": "hypertension"}, {"medicine": "Brufen", "condition": "knee pain"}]
+}

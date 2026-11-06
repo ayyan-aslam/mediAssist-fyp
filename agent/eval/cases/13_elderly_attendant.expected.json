@@ -1,0 +1,10 @@
+{
+  "description": "Attendant speaker; a medicine is stopped; one continued",
+  "symptoms_present": [["dizziness", "dizzy"], ["fall"]],
+  "symptoms_absent": [["head injury", "loss of consciousness"]],
+  "prescribed": [
+    {"name": "Concor", "aliases": ["bisoprolol"], "strength": "5 mg", "frequency": "once a day", "status": "continued"}
+  ],
+  "not_prescribed": ["Xanax"],
+  "history": [{"medicine": "Concor", "condition": "blood pressure"}, {"medicine": "Xanax", "condition": "sleep"}]
+}

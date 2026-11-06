@@ -1,0 +1,16 @@
+# MediAssist agent (Python 3.10+). Install inside agent/.venv:
+#   python -m venv .venv  &&  .venv\Scripts\activate  &&  pip install -r requirements.txt
+langgraph>=0.4,<2
+langchain-core>=0.3,<2
+langchain-openai>=0.3,<2
+openai>=1.40
+pydantic>=2.7,<3
+python-dotenv>=1.0
+psycopg[binary]>=3.2,<4
+
+# reading the datasets (pure Python - no pandas/numpy needed)
+openpyxl>=3.1
+xlrd>=2.0.1
+
+# tests
+pytest>=8.0

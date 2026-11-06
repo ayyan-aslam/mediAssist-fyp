@@ -1,0 +1,12 @@
+Doctor: How is your breathing?
+Patient: I have asthma since childhood. For the last week I wake up at night coughing and my chest is tight.
+Doctor: Are you using your inhaler?
+Patient: Yes, Ventolin, almost every night now.
+Doctor: Any fever?
+Patient: No.
+Doctor: There is wheezing on both sides of the chest. Your asthma is not controlled.
+Doctor: Continue Ventolin inhaler, two puffs when you feel breathless.
+Doctor: I am adding Seretide 250 inhaler, one puff twice a day, every day, even when you feel fine.
+Doctor: Rinse your mouth after using Seretide.
+Patient: For how long?
+Doctor: For three months, then we will review.

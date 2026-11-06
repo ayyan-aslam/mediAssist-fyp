@@ -1,0 +1,9 @@
+Doctor: Show me the rash.
+Patient: It is on both arms, very itchy, for one week. Some spots are oozing.
+Doctor: Any fever?
+Patient: No.
+Doctor: It looks like infected eczema.
+Doctor: Apply Fucicort cream twice a day on the affected area for seven days.
+Doctor: And take Rigix 10 mg, one tablet at night for five days for the itching.
+Patient: Can I use soap on it?
+Doctor: Use a mild soap and keep the skin moisturised.
