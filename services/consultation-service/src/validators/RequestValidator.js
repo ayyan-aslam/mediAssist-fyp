@@ -63,8 +63,11 @@ const pageSchema = {
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
 };
 const listSchema = z.object(pageSchema);
-// SOAP note search by patient name or phone: at least 2 characters.
-const searchSchema = z.object({ q: z.string().trim().min(2).max(100), ...pageSchema });
+// Search by patient name or phone: at least 2 characters.
+const searchText = z.string().trim().min(2).max(100);
+const searchSchema = z.object({ q: searchText, ...pageSchema });
+// The patients list: the search text is optional.
+const patientListSchema = z.object({ q: searchText.optional(), ...pageSchema });
 
 function parse(schema, data) {
   const result = schema.safeParse(data ?? {});
@@ -114,6 +117,10 @@ export class RequestValidator {
 
   validateSearch(query) {
     return parse(searchSchema, query);
+  }
+
+  validatePatientList(query) {
+    return parse(patientListSchema, query);
   }
 
   // An ID in the URL. A value that is not a valid ID cannot exist, so notFoundError() is thrown.

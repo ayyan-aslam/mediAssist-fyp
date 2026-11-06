@@ -170,6 +170,22 @@ export interface FinishEditingResponse {
   changed: boolean;
 }
 
+// GET /clinical-patients/{patientId}/soap-notes: every consultation of the patient.
+// assessment is null while the consultation has no SOAP note.
+export interface PatientSoapNoteItem {
+  consultationId: number;
+  date: string;
+  status: ConsultationStatus;
+  assessment: string | null;
+}
+
+// GET /soap-notes and GET /soap-notes/search
+export interface SoapNoteListItem {
+  consultationId: number;
+  date: string;
+  patient: { clinicalPatientId: number; fullName: string; phone: string };
+}
+
 // GET /consultations/events (SSE): the data line of each event.
 export type ConsultationEvent =
   | { event: "soap_ready"; data: { consultationId: number } }

@@ -412,6 +412,41 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
     expect((await soapNotes.search(doctorId, 'zarq__', page)).total).toBe(0);
   });
 
+  it('lists the doctor’s latest notes without q, newest first', async () => {
+    const patient = await patients.insert(doctorId, newPatient('03219990003'));
+    const c = await consultations.create({ clinicalPatientId: patient.clinicalPatientId, status: 'completed', startedAt: new Date(Date.UTC(2030, 0, 1)) });
+    await prisma.soapNote.create({ data: { consultationId: c.consultationId } });
+
+    const latest = await soapNotes.search(doctorId, undefined, { page: 1, pageSize: 1 });
+    expect(latest.rows).toEqual([expect.objectContaining({ consultationId: c.consultationId, phone: '03219990003' })]);
+    expect(latest.total).toBeGreaterThan(1);
+    expect((await soapNotes.search(otherDoctorId, undefined, { page: 1, pageSize: 50 })).rows.map((r) => r.consultationId)).not.toContain(c.consultationId);
+  });
+
+  it('lists the doctor’s patients newest first, filtered by part of the name or phone', async () => {
+    const first = await patients.insert(doctorId, { ...newPatient('03219990004'), fullName: 'Qudsia List_Test' });
+    const second = await patients.insert(doctorId, { ...newPatient('03219990005'), fullName: 'Qudsia Other' });
+    await patients.insert(otherDoctorId, { ...newPatient('03219990004'), fullName: 'Qudsia List_Test' });
+    const page = { page: 1, pageSize: 20 };
+
+    const byName = await patients.list(doctorId, 'qudsia', page);
+    expect(byName.total).toBe(2);
+    expect(byName.rows.map((r) => r.clinicalPatientId)).toEqual([second.clinicalPatientId, first.clinicalPatientId]);
+    expect(byName.rows[1]).toEqual({
+      clinicalPatientId: first.clinicalPatientId,
+      fullName: 'Qudsia List_Test',
+      phone: '03219990004',
+      email: null,
+      age: 45,
+      gender: 'male',
+      createdAt: expect.any(Date),
+    });
+    expect((await patients.list(doctorId, '9990005', page)).total).toBe(1);
+    expect((await patients.list(doctorId, 'list_t', page)).total).toBe(1);
+    expect((await patients.list(doctorId, 'list%', page)).total).toBe(0);
+    expect((await patients.list(doctorId, undefined, page)).total).toBeGreaterThanOrEqual(2);
+  });
+
   it('finds all transcript windows in order', async () => {
     const { consultationId } = await newConsultation('processing');
     await transcripts.createPendingWindow(consultationId, 2);

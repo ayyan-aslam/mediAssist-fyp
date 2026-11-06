@@ -41,6 +41,12 @@ export class PatientService {
     return row ? { found: true, patient: toPatient(row) } : { found: false, patient: null };
   }
 
+  // The patients list (paged, design doc 5.1.2), newest first, optionally filtered by name or phone.
+  async list(doctorId, { q, page, pageSize }) {
+    const { rows, total } = await this.patientRepository.list(doctorId, q, { page, pageSize });
+    return { items: rows.map(toPatient), page, pageSize, total };
+  }
+
   async getById(doctorId, clinicalPatientId) {
     const row = await this.patientRepository.findByDoctorAndId(doctorId, clinicalPatientId);
     if (!row) throw patientNotFoundError();

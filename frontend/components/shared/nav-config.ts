@@ -17,8 +17,8 @@ export const navByArea: Record<Area, NavItem[]> = {
   doctor: [
     { href: "/doctor", label: "Home", icon: LayoutDashboard },
     { href: NEW_CONSULTATION_HREF, label: "New consultation", icon: CirclePlus },
-    { href: "/doctor/patients", label: "Patients & notes", icon: Users, soon: true },
-    { href: "/doctor/search", label: "Search", icon: Search, soon: true },
+    { href: "/doctor/patients", label: "Patients & notes", icon: Users },
+    { href: "/doctor/search", label: "Search", icon: Search },
     { href: "/doctor/profile", label: "Profile", icon: UserRound },
   ],
 };

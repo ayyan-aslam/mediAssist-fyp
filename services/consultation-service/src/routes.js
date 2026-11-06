@@ -6,10 +6,11 @@ export function createRouter({ patientController, consultationController, soapNo
   const router = Router();
 
   router.post('/clinical-patients', patientController.create);
-  router.get('/clinical-patients', patientController.findByPhone);
+  router.get('/clinical-patients', patientController.findOrList);
   router.get('/clinical-patients/:patientId', patientController.getById);
   router.patch('/clinical-patients/:patientId', patientController.update);
   router.get('/clinical-patients/:patientId/soap-notes', soapNoteController.listForPatient);
+  router.get('/soap-notes', soapNoteController.listRecent);
   router.get('/soap-notes/search', soapNoteController.search);
 
   router.post('/consultations', consultationController.start);

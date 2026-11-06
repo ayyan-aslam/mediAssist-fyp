@@ -30,6 +30,7 @@ function createFakeRepositories() {
   const windows = [];
   const soapNotes = [];
 
+  const matches = (patient, q) => patient.fullName.toLowerCase().includes(q.toLowerCase()) || patient.phone.includes(q);
   const phoneTaken = (doctorId, phone, exceptId) =>
     patients.some((p) => p.doctorId === doctorId && p.phone === phone && p.clinicalPatientId !== exceptId);
 
@@ -45,6 +46,13 @@ function createFakeRepositories() {
     },
     async findByDoctorAndId(doctorId, id) {
       return patients.find((p) => p.doctorId === doctorId && p.clinicalPatientId === id) ?? null;
+    },
+    // Like ILIKE '%q%' on the name or phone, newest first.
+    async list(doctorId, q, { page, pageSize }) {
+      const rows = patients
+        .filter((p) => p.doctorId === doctorId && (!q || matches(p, q)))
+        .sort((a, b) => b.createdAt - a.createdAt || b.clinicalPatientId - a.clinicalPatientId);
+      return { rows: rows.slice((page - 1) * pageSize, page * pageSize), total: rows.length };
     },
     async update(doctorId, id, changes) {
       const row = patients.find((p) => p.doctorId === doctorId && p.clinicalPatientId === id);
@@ -177,13 +185,12 @@ function createFakeRepositories() {
         .map((c) => ({ ...c, soapNote: noteOf(c.consultationId) }));
       return { rows: pageOf(rows, paging), total: rows.length };
     },
-    // Like ILIKE '%q%' on the name or phone.
+    // Like ILIKE '%q%' on the name or phone. Without q, all the doctor's notes.
     async search(doctorId, q, paging) {
-      const text = q.toLowerCase();
       const rows = consultations
         .filter((c) => noteOf(c.consultationId))
         .map((c) => ({ ...c, ...patientOf(c) }))
-        .filter((r) => r.doctorId === doctorId && (r.fullName.toLowerCase().includes(text) || r.phone.includes(text)))
+        .filter((r) => r.doctorId === doctorId && (!q || matches(r, q)))
         .sort(newestFirst);
       return { rows: pageOf(rows, paging), total: rows.length };
     },

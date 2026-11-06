@@ -254,6 +254,47 @@ describe('SOAP notes', () => {
     });
   });
 
+  describe('GET /soap-notes', () => {
+    beforeEach(async () => {
+      await ctx.as().post('/consultations').send({ clinicalPatientId: 1 });
+      await ctx.as().post('/consultations').send({ clinicalPatientId: 1 });
+      await ctx.as(OTHER_DOCTOR_ID).post('/clinical-patients').send(validPatient);
+      await ctx.as(OTHER_DOCTOR_ID).post('/consultations').send({ clinicalPatientId: 2 });
+      ctx.consultations.forEach((c, i) => (c.startedAt = new Date(Date.UTC(2026, 9, 7 + i, 9))));
+      // Consultation 2 has no note yet: not listed.
+      [1, 3, 4].forEach((id) => ctx.addSoapNote(id));
+    });
+
+    it('lists the doctor’s own notes newest first, only consultations with a note', async () => {
+      const res = await ctx.as().get('/soap-notes?pageSize=5');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        items: [
+          {
+            consultationId: 3,
+            date: '2026-10-09',
+            patient: { clinicalPatientId: 1, fullName: 'Bilal Hussain', phone: '03214567890' },
+          },
+          {
+            consultationId: 1,
+            date: '2026-10-07',
+            patient: { clinicalPatientId: 1, fullName: 'Bilal Hussain', phone: '03214567890' },
+          },
+        ],
+        page: 1,
+        pageSize: 5,
+        total: 2,
+      });
+    });
+
+    it('returns 400 VALIDATION_ERROR for a wrong page size', async () => {
+      const res = await ctx.as().get('/soap-notes?pageSize=0');
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
   describe('GET /soap-notes/search', () => {
     beforeEach(async () => {
       await ctx.as().post('/clinical-patients').send({ ...validPatient, fullName: 'Ayesha Khan', phone: '03001112233' });
