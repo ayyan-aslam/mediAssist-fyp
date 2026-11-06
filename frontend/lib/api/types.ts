@@ -113,12 +113,14 @@ export interface StartConsultationResponse {
 
 export type ConsultationStatus = "recording" | "processing" | "completed" | "failed";
 
+export type FailureReason = "TRANSCRIPTION_FAILED" | "AI_FAILED" | "AI_TIMEOUT";
+
 // GET /consultations/{consultationId}
 export interface Consultation {
   consultationId: number;
   patient: { clinicalPatientId: number; fullName: string; phone: string };
   status: ConsultationStatus;
-  failureReason: "TRANSCRIPTION_FAILED" | "AI_FAILED" | "AI_TIMEOUT" | null;
+  failureReason: FailureReason | null;
   followUpDate: string | null;
   startedAt: string;
   endedAt: string | null;
@@ -136,3 +138,17 @@ export interface StopConsultationResponse {
   status: "processing";
   endedAt: string;
 }
+
+// POST /consultations/{consultationId}/retry
+export interface RetryConsultationResponse {
+  consultationId: number;
+  status: "processing";
+}
+
+// GET /consultations/events (SSE): the data line of each event.
+export type ConsultationEvent =
+  | { event: "soap_ready"; data: { consultationId: number } }
+  | {
+      event: "consultation_failed";
+      data: { consultationId: number; failureReason: FailureReason; message: string };
+    };

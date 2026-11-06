@@ -5,6 +5,7 @@ import type {
   Consultation,
   CreateClinicalPatientRequest,
   FindClinicalPatientResponse,
+  RetryConsultationResponse,
   StartConsultationResponse,
   StopConsultationResponse,
   UpdateClinicalPatientRequest,
@@ -50,4 +51,8 @@ export const consultationsApi = {
       body: { totalParts },
       silent: true,
     }),
+
+  // After a failure: the next attempt, without recording again.
+  retry: (consultationId: number) =>
+    api<RetryConsultationResponse>(`/consultations/${consultationId}/retry`, { method: "POST", silent: true }),
 };

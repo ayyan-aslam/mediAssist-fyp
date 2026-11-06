@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { env } from "@/lib/env";
 import { mockFetch } from "@/lib/api/mocks";
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "@/lib/api/tokens";
+import { clearTokens, getAccessToken, getAccessTokenExpiry, getRefreshToken, setTokens } from "@/lib/api/tokens";
 import type { ApiErrorBody, RefreshResponse } from "@/lib/api/types";
 
 // Error thrown by api() when the backend answers with the shared error shape (design doc 5.1.3).
@@ -90,6 +90,17 @@ async function refreshTokens() {
 // Asks for new tokens with the saved refresh token. Used by the AuthContext on page load.
 export function restoreSession() {
   return refreshOnce();
+}
+
+// For requests that cannot refresh on 401 themselves, like an EventSource (SSE).
+// Returns the access token, refreshed first when it expires within the margin (or when force is true).
+// Returns null when there is no session or the refresh failed; the caller tries again later.
+export async function freshAccessToken({ force = false, marginMs = 60_000 } = {}) {
+  const expiresAt = getAccessTokenExpiry();
+  const current = getAccessToken();
+  if (current && !force && expiresAt !== null && expiresAt - Date.now() > marginMs) return current;
+  const refreshed = await refreshOnce();
+  return refreshed ? getAccessToken() : null;
 }
 
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
