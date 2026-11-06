@@ -52,7 +52,7 @@ services:
       retries: 5
       start_period: 30s
 
-  # Starts only with: docker compose --profile services up -d --build
+  # Starts only with the services profile: COMPOSE_PROFILES=services in .env, or docker compose --profile services up -d --build
   # (in daily work the service runs on the host with npm run dev, on the same port).
   consultation-service:
     profiles: ["services"]
@@ -90,7 +90,7 @@ services:
       retries: 5
       start_period: 30s
 
-  # AI Pipeline (agent/). Starts only with: docker compose --profile services up -d --build
+  # AI Pipeline (agent/). Starts only with the services profile, like the Consultation Service above
   # (in daily work it runs on the host: python -m mediassist_agent.run --rabbitmq in agent\).
   # It only connects: until the Consultation Service has created the queues, it tries again every 5 seconds.
   agent:

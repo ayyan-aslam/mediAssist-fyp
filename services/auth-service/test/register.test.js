@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CnicEncryptor } from '../src/services/CnicEncryptor.js';
-import { createTestContext, testConfig, validDoctor } from './helpers.js';
+import { createTestContext, testConfig, uniqueViolation, validDoctor } from './helpers.js';
 
 describe('POST /auth/doctor/register', () => {
   let ctx;
@@ -94,6 +94,20 @@ describe('POST /auth/doctor/register', () => {
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe(code);
     expect(ctx.firebaseClient.createUser).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['PHONE_TAKEN', 'users_phone_key'],
+    ['CNIC_TAKEN', 'doctor_profile_cnic_hash_key'],
+    ['REGISTRATION_NO_TAKEN', 'doctor_profile_registration_no_key'],
+  ])('returns 409 %s and deletes the Firebase user when another sign-up saved it at the same moment', async (code, index) => {
+    ctx.userRepository.createUserWithProfile.mockRejectedValueOnce(uniqueViolation(index));
+
+    const res = await register(validDoctor);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe(code);
+    expect(ctx.firebaseClient.deleteUser).toHaveBeenCalledWith('firebase-uid-1');
   });
 
   it('deletes the Firebase user and returns 500 SIGNUP_FAILED when the database save fails', async () => {

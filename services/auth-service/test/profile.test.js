@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createTestContext, validDoctor } from './helpers.js';
+import { createTestContext, uniqueViolation, validDoctor } from './helpers.js';
 
 const otherDoctor = {
   ...validDoctor,
@@ -136,6 +136,17 @@ describe('profile', () => {
         error: { code: 'PHONE_TAKEN', message: 'This phone number is already registered.' },
       });
       expect(ctx.userRepository.updateProfile).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 PHONE_TAKEN when another user saved the same phone at the same moment', async () => {
+      ctx.userRepository.updateProfile.mockRejectedValueOnce(uniqueViolation('users_phone_key'));
+
+      const res = await patchMe({ phone: '03009998887' });
+
+      expect(res.status).toBe(409);
+      expect(res.body).toEqual({
+        error: { code: 'PHONE_TAKEN', message: 'This phone number is already registered.' },
+      });
     });
 
     it('returns 400 VALIDATION_ERROR for a speciality that does not exist', async () => {

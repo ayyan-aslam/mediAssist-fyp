@@ -1,7 +1,12 @@
 import { AppError } from '@mediassist/common';
+import { takenField } from '../repositories/UserRepository.js';
 
 function userNotFoundError() {
   return new AppError(404, 'USER_NOT_FOUND', 'Your account was not found. Please log in again.');
+}
+
+function phoneTakenError() {
+  return new AppError(409, 'PHONE_TAKEN', 'This phone number is already registered.');
 }
 
 // Builds the GET /users/me response (design doc Section 5.2). The CNIC is never sent back.
@@ -48,15 +53,19 @@ export class ProfileService {
     }
     if (phone) {
       const owner = await this.userRepository.findByPhone(phone);
-      if (owner && owner.userId !== userId) {
-        throw new AppError(409, 'PHONE_TAKEN', 'This phone number is already registered.');
-      }
+      if (owner && owner.userId !== userId) throw phoneTakenError();
     }
     if (profile.specialtyId && !(await this.specialtyRepository.findById(profile.specialtyId))) {
       throw new AppError(400, 'VALIDATION_ERROR', 'specialtyId: this speciality does not exist.');
     }
 
-    await this.userRepository.updateProfile(userId, role, { fullName, phone, profile });
+    try {
+      await this.userRepository.updateProfile(userId, role, { fullName, phone, profile });
+    } catch (err) {
+      // Another user saved the same phone at the same moment, after the check above.
+      if (takenField(err) === 'phone') throw phoneTakenError();
+      throw err;
+    }
     return this.getProfile(userId);
   }
 }
