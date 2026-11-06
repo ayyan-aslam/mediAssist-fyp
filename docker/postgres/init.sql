@@ -8,7 +8,6 @@
 \getenv document_password DOCUMENT_DB_PASSWORD
 \getenv chat_password CHAT_DB_PASSWORD
 \getenv consultation_password CONSULTATION_DB_PASSWORD
-\getenv soap_worker_password SOAP_WORKER_DB_PASSWORD
 \getenv prescription_password PRESCRIPTION_DB_PASSWORD
 \getenv medicine_ai_password MEDICINE_AI_DB_PASSWORD
 \getenv notification_password NOTIFICATION_DB_PASSWORD
@@ -25,7 +24,6 @@ CREATE ROLE auth_service         LOGIN CREATEDB PASSWORD :'auth_password';
 CREATE ROLE document_service     LOGIN PASSWORD :'document_password';
 CREATE ROLE chat_service         LOGIN PASSWORD :'chat_password';
 CREATE ROLE consultation_service LOGIN CREATEDB PASSWORD :'consultation_password';
-CREATE ROLE soap_worker          LOGIN PASSWORD :'soap_worker_password';
 CREATE ROLE prescription_service LOGIN CREATEDB PASSWORD :'prescription_password';
 CREATE ROLE medicine_ai_service  LOGIN PASSWORD :'medicine_ai_password';
 CREATE ROLE notification_service LOGIN CREATEDB PASSWORD :'notification_password';
@@ -34,7 +32,7 @@ CREATE ROLE audit_service        LOGIN PASSWORD :'audit_password';
 CREATE ROLE audit_owner          LOGIN CREATEDB PASSWORD :'audit_owner_password';
 
 GRANT CONNECT ON DATABASE :"db_name" TO
-  auth_service, document_service, chat_service, consultation_service, soap_worker,
+  auth_service, document_service, chat_service, consultation_service,
   prescription_service, medicine_ai_service, notification_service, audit_service, audit_owner;
 
 -- One schema per service. The owner has full rights on its own schema and no rights on the others.
@@ -52,20 +50,11 @@ ALTER ROLE auth_service         SET search_path = userdb, public;
 ALTER ROLE document_service     SET search_path = documentdb, public;
 ALTER ROLE chat_service         SET search_path = chatdb, public;
 ALTER ROLE consultation_service SET search_path = consultationdb, public;
-ALTER ROLE soap_worker          SET search_path = consultationdb, public;
 ALTER ROLE prescription_service SET search_path = prescriptiondb, public;
 ALTER ROLE medicine_ai_service  SET search_path = medicinedb, public;
 ALTER ROLE notification_service SET search_path = notificationdb, public;
 ALTER ROLE audit_service        SET search_path = auditdb, public;
 ALTER ROLE audit_owner          SET search_path = auditdb, public;
-
--- SOAP Worker shares ConsultationDB (design doc 4.2.1).
--- It can read and write the tables that the Consultation Service creates, but cannot create, drop or delete.
-GRANT USAGE ON SCHEMA consultationdb TO soap_worker;
-ALTER DEFAULT PRIVILEGES FOR ROLE consultation_service IN SCHEMA consultationdb
-  GRANT SELECT, INSERT, UPDATE ON TABLES TO soap_worker;
-ALTER DEFAULT PRIVILEGES FOR ROLE consultation_service IN SCHEMA consultationdb
-  GRANT USAGE, SELECT ON SEQUENCES TO soap_worker;
 
 -- AuditDB rows can only be added (design doc 4.4.8).
 -- The Audit Service login gets only SELECT and INSERT on every table that audit_owner creates.
