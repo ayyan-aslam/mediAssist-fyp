@@ -16,6 +16,7 @@ export class SoapNoteService {
     transcriptRepository,
     transcriptionService,
     eventPublisher,
+    sseManager,
     aiAnswerTimeoutSec,
     logger,
   }) {
@@ -23,6 +24,7 @@ export class SoapNoteService {
     this.transcriptRepository = transcriptRepository;
     this.transcriptionService = transcriptionService;
     this.eventPublisher = eventPublisher;
+    this.sseManager = sseManager;
     this.aiAnswerTimeoutSec = aiAnswerTimeoutSec;
     this.logger = logger;
   }
@@ -127,9 +129,10 @@ export class SoapNoteService {
     }
   }
 
-  // Tells the doctor's app. For now it only logs; the SSE connection is added later.
+  // Tells the doctor's app by SSE (design doc 5.5 GET /consultations/events).
   notifyDoctor(doctorId, event, data) {
     this.logger.info({ doctorId, event, data }, 'Doctor notification');
+    this.sseManager.send(doctorId, event, data);
   }
 
   async #fail(consultationId, failureReason, attempt) {

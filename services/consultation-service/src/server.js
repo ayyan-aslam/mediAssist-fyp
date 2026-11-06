@@ -11,6 +11,7 @@ import { SoapNoteRepository } from './repositories/SoapNoteRepository.js';
 import { TranscriptRepository } from './repositories/TranscriptRepository.js';
 import { AudioMerger } from './services/AudioMerger.js';
 import { SoapNoteService } from './services/SoapNoteService.js';
+import { SseManager } from './services/SseManager.js';
 import { TranscriptionService } from './services/TranscriptionService.js';
 
 // The AI answer check runs this often (design doc 3.8).
@@ -58,12 +59,16 @@ const transcriptionService = new TranscriptionService({
   overlapParts: config.TRANSCRIPTION_OVERLAP_PARTS,
   logger,
 });
+// The doctors' open live update streams (design doc 3.7).
+const sseManager = new SseManager({ logger });
+
 // Stop, AI Pipeline answers and the AI answer check (design doc Diagram 6 Parts 2 and 3).
 const soapNoteService = new SoapNoteService({
   soapNoteRepository: new SoapNoteRepository(prisma),
   transcriptRepository,
   transcriptionService,
   eventPublisher,
+  sseManager,
   aiAnswerTimeoutSec: config.AI_ANSWER_TIMEOUT_SEC,
   logger,
 });
@@ -97,6 +102,7 @@ const app = createApp({
   transcriptRepository,
   s3Client,
   eventPublisher,
+  sseManager,
 });
 
 const aiAnswerCheck = setInterval(() => {
@@ -113,6 +119,7 @@ const server = app.listen(config.CONSULTATION_SERVICE_PORT, (err) => {
 
 function shutdown() {
   clearInterval(aiAnswerCheck);
+  sseManager.closeAll();
   server.close(async () => {
     await rabbit.close();
     await prisma.$disconnect();

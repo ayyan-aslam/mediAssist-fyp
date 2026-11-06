@@ -2,6 +2,7 @@ import { createLogger } from '@mediassist/common';
 import request from 'supertest';
 import { vi } from 'vitest';
 import { createApp } from '../src/app.js';
+import { SseManager } from '../src/services/SseManager.js';
 
 export const DOCTOR_ID = 16;
 export const OTHER_DOCTOR_ID = 17;
@@ -162,13 +163,16 @@ export function createTestContext() {
   const fakes = createFakeRepositories();
   const s3Client = { upload: vi.fn(async (key) => key) };
   const eventPublisher = { publish: vi.fn(async (type, data) => ({ type, data })) };
+  const logger = createLogger('test', 'silent');
+  const sseManager = new SseManager({ logger });
   const app = createApp({
-    logger: createLogger('test', 'silent'),
+    logger,
     patientRepository: fakes.patientRepository,
     consultationRepository: fakes.consultationRepository,
     transcriptRepository: fakes.transcriptRepository,
     s3Client,
     eventPublisher,
+    sseManager,
   });
 
   // A request with the headers the API Gateway adds after it checks the token and the role.
@@ -178,5 +182,5 @@ export function createTestContext() {
     patch: (url) => request(app).patch(url).set('x-user-id', String(doctorId)).set('x-user-role', role),
   });
 
-  return { app, as, s3Client, eventPublisher, ...fakes };
+  return { app, as, s3Client, eventPublisher, sseManager, ...fakes };
 }

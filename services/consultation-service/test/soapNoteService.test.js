@@ -65,11 +65,13 @@ function createContext() {
   };
   const transcriptionService = { transcribeMissing: vi.fn(async () => ({ failedWindowNos: [] })) };
   const eventPublisher = { publish: vi.fn(async (type, data) => ({ type, data })) };
+  const sseManager = { send: vi.fn() };
   const service = new SoapNoteService({
     soapNoteRepository,
     transcriptRepository,
     transcriptionService,
     eventPublisher,
+    sseManager,
     aiAnswerTimeoutSec: 60,
     logger: createLogger('test', 'silent'),
   });
@@ -82,6 +84,7 @@ function createContext() {
     soapNoteRepository,
     transcriptionService,
     eventPublisher,
+    sseManager,
     notifyDoctor,
   };
 }
@@ -182,6 +185,13 @@ describe('SoapNoteService', () => {
         plan: 'Panadol 500 mg, 1 tablet, twice a day, 3 days\nWarm salt water gargles.',
       });
       expect(ctx.notifyDoctor).toHaveBeenCalledWith(DOCTOR_ID, 'soap_ready', { consultationId: CONSULTATION_ID });
+    });
+
+    it('sends soap_ready to the doctor by SSE', async () => {
+      await ctx.service.saveGenerated(generated());
+      expect(ctx.sseManager.send).toHaveBeenCalledExactlyOnceWith(DOCTOR_ID, 'soap_ready', {
+        consultationId: CONSULTATION_ID,
+      });
     });
 
     it('saves null parts as empty strings', async () => {

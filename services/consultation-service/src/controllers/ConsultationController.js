@@ -3,10 +3,17 @@ import { currentDoctorId } from './currentDoctor.js';
 
 // Consultation endpoints: design doc Section 5.5.
 export class ConsultationController {
-  constructor({ requestValidator, consultationService }) {
+  constructor({ requestValidator, consultationService, sseManager }) {
     this.requestValidator = requestValidator;
     this.consultationService = consultationService;
+    this.sseManager = sseManager;
   }
+
+  // SSE stream of the doctor's live updates. It stays open until the app disconnects.
+  events = (req, res) => {
+    const doctorId = currentDoctorId(req);
+    this.sseManager.connect(doctorId, req, res);
+  };
 
   start = async (req, res) => {
     const doctorId = currentDoctorId(req);
