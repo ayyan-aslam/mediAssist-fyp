@@ -39,6 +39,14 @@ export class ConsultationRepository {
     });
   }
 
+  // The parts from firstPartNo to lastPartNo, in play order.
+  findPartsInRange(consultationId, firstPartNo, lastPartNo) {
+    return this.prisma.audioPart.findMany({
+      where: { consultationId, partNo: { gte: firstPartNo, lte: lastPartNo } },
+      orderBy: { partNo: 'asc' },
+    });
+  }
+
   // Internal use only (Prescription Service): no doctor check.
   findPatientContact(consultationId) {
     return this.prisma.consultation.findUnique({

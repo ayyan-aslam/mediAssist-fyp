@@ -1,5 +1,6 @@
-import { EventPublisher, RabbitConnection, setupTopology } from '@mediassist/common';
+import { EventConsumer, EventPublisher, RabbitConnection, setupTopology } from '@mediassist/common';
 import { createApp } from './app.js';
+import { loadPrompt, OpenAIClient } from './clients/OpenAIClient.js';
 import { S3Client } from './clients/S3Client.js';
 import { config } from './config.js';
 import { createPrismaClient } from './db/prisma.js';
@@ -7,6 +8,8 @@ import { logger } from './logger.js';
 import { ConsultationRepository } from './repositories/ConsultationRepository.js';
 import { PatientRepository } from './repositories/PatientRepository.js';
 import { TranscriptRepository } from './repositories/TranscriptRepository.js';
+import { AudioMerger } from './services/AudioMerger.js';
+import { TranscriptionService } from './services/TranscriptionService.js';
 
 // The config is checked on import (./config.js). Then RabbitMQ, then the HTTP server.
 const prisma = createPrismaClient(config.CONSULTATION_DATABASE_URL);
@@ -21,6 +24,41 @@ const topologyReady = new Promise((resolve) => {
     resolve();
   });
 });
+
+const consultationRepository = new ConsultationRepository(prisma);
+const transcriptRepository = new TranscriptRepository(prisma);
+const s3Client = new S3Client({
+  region: config.AWS_REGION,
+  accessKeyId: config.AWS_ACCESS_KEY_ID,
+  secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
+  bucket: config.S3_BUCKET_NAME,
+});
+
+// Transcription module: reads audio.window.ready and transcribes each minute (design doc Diagram 6 Part 1).
+// Registered after the topology, so its queue exists before it is read.
+const transcriptionService = new TranscriptionService({
+  transcriptRepository,
+  consultationRepository,
+  s3Client,
+  audioMerger: new AudioMerger(),
+  openAIClient: new OpenAIClient({
+    apiKey: config.OPENAI_API_KEY,
+    transcribeModel: config.OPENAI_TRANSCRIBE_MODEL,
+    cleanupModel: config.OPENAI_CLEANUP_MODEL,
+    timeoutSec: config.OPENAI_TIMEOUT_SEC,
+    cleanupPrompt: await loadPrompt('transcript-cleanup.md'),
+  }),
+  transcriptionContext: await loadPrompt('transcription-context.md'),
+  overlapParts: config.TRANSCRIPTION_OVERLAP_PARTS,
+  logger,
+});
+const eventConsumer = new EventConsumer({ connection: rabbit, logger });
+eventConsumer.consume(
+  'consultation.audio.window.ready',
+  ({ data }) => transcriptionService.transcribeWindow(data.consultationId, data.windowNo),
+  { prefetch: 5 },
+);
+
 await rabbit.start();
 logger.info('Waiting for RabbitMQ to create the exchange and queues');
 await topologyReady;
@@ -28,14 +66,9 @@ await topologyReady;
 const app = createApp({
   logger,
   patientRepository: new PatientRepository(prisma),
-  consultationRepository: new ConsultationRepository(prisma),
-  transcriptRepository: new TranscriptRepository(prisma),
-  s3Client: new S3Client({
-    region: config.AWS_REGION,
-    accessKeyId: config.AWS_ACCESS_KEY_ID,
-    secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
-    bucket: config.S3_BUCKET_NAME,
-  }),
+  consultationRepository,
+  transcriptRepository,
+  s3Client,
   eventPublisher: new EventPublisher({ connection: rabbit, source: 'consultation-service', logger }),
 });
 

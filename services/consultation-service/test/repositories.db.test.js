@@ -164,6 +164,43 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
     expect(await transcripts.createPendingWindow(consultationId, 1)).toBe(true);
   });
 
+  it('finds the parts of a range in play order', async () => {
+    const patient = await patients.insert(doctorId, newPatient('03000000012'));
+    const { consultationId } = await consultations.create({
+      clinicalPatientId: patient.clinicalPatientId,
+      status: 'recording',
+      startedAt: new Date(),
+    });
+    for (const partNo of [8, 6, 7, 13]) {
+      await consultations.savePart({ consultationId, partNo, fileKey: `test/${consultationId}/${partNo}.webm`, durationSec: 10 });
+    }
+
+    const parts = await consultations.findPartsInRange(consultationId, 6, 12);
+
+    expect(parts.map((p) => p.partNo)).toEqual([6, 7, 8]);
+    expect(parts[0].fileKey).toBe(`test/${consultationId}/6.webm`);
+  });
+
+  it('saves the text of a window as done in UTF-8, and marks a window failed', async () => {
+    const patient = await patients.insert(doctorId, newPatient('03000000013'));
+    const { consultationId } = await consultations.create({
+      clinicalPatientId: patient.clinicalPatientId,
+      status: 'recording',
+      startedAt: new Date(),
+    });
+    await transcripts.createPendingWindow(consultationId, 1);
+    await transcripts.createPendingWindow(consultationId, 2);
+    const text = 'Doctor: Kya masla hai?\nPatient: 3 dinan ton gala kharab ae – سر میں درد';
+
+    await transcripts.saveText(consultationId, 1, text);
+    await transcripts.updateStatus(consultationId, 2, 'failed');
+
+    expect(await transcripts.findWindow(consultationId, 1)).toMatchObject({ status: 'done', transcriptText: text });
+    expect(await transcripts.findWindow(consultationId, 2)).toMatchObject({ status: 'failed', transcriptText: null });
+    expect(await transcripts.findWindow(consultationId, 3)).toBeNull();
+    await expect(transcripts.updateStatus(consultationId, 2, 'unknown')).rejects.toThrow();
+  });
+
   it('deletes the audio parts, transcript windows and SOAP note with their consultation', async () => {
     const patient = await patients.insert(doctorId, newPatient('03000000008'));
     const { consultationId } = await consultations.create({
