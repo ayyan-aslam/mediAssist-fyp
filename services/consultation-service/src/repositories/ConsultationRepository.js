@@ -1,6 +1,6 @@
 const PATIENT_SUMMARY = { select: { clinicalPatientId: true, fullName: true, phone: true } };
 
-// Reads and saves CONSULTATION rows (and later AUDIO_PART rows).
+// Reads and saves CONSULTATION and AUDIO_PART rows.
 // A consultation belongs to the doctor who owns its clinic patient.
 export class ConsultationRepository {
   constructor(prisma) {
@@ -16,6 +16,26 @@ export class ConsultationRepository {
     return this.prisma.consultation.findFirst({
       where: { consultationId, clinicalPatient: { doctorId } },
       include: { clinicalPatient: PATIENT_SUMMARY },
+    });
+  }
+
+  findPart(consultationId, partNo) {
+    return this.prisma.audioPart.findUnique({
+      where: { consultationId_partNo: { consultationId, partNo } },
+    });
+  }
+
+  // Throws Prisma error P2002 when the part is already saved (the same part sent twice at once).
+  savePart({ consultationId, partNo, fileKey, durationSec }) {
+    return this.prisma.audioPart.create({
+      data: { consultationId, partNo, fileKey, durationSec, recordedAt: new Date() },
+    });
+  }
+
+  // Number of saved parts from firstPartNo to lastPartNo.
+  countPartsInRange(consultationId, firstPartNo, lastPartNo) {
+    return this.prisma.audioPart.count({
+      where: { consultationId, partNo: { gte: firstPartNo, lte: lastPartNo } },
     });
   }
 

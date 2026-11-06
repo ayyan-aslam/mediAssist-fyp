@@ -12,10 +12,12 @@
     "db:deploy": "prisma migrate deploy"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1163.0",
     "@mediassist/common": "^0.1.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "express": "^5.3.0",
+    "multer": "^2.5.0",
     "pg": "^8.23.1",
     "zod": "^4.6.5"
   },

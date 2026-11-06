@@ -7,8 +7,15 @@ import { ConsultationService } from './services/ConsultationService.js';
 import { PatientService } from './services/PatientService.js';
 import { RequestValidator } from './validators/RequestValidator.js';
 
-// Repositories are passed in, so tests can replace them.
-export function createApp({ logger, patientRepository, consultationRepository }) {
+// Repositories, the S3Client and the EventPublisher are passed in, so tests can replace them.
+export function createApp({
+  logger,
+  patientRepository,
+  consultationRepository,
+  transcriptRepository,
+  s3Client,
+  eventPublisher,
+}) {
   const requestValidator = new RequestValidator();
   const patientController = new PatientController({
     requestValidator,
@@ -16,7 +23,14 @@ export function createApp({ logger, patientRepository, consultationRepository })
   });
   const consultationController = new ConsultationController({
     requestValidator,
-    consultationService: new ConsultationService({ consultationRepository, patientRepository }),
+    consultationService: new ConsultationService({
+      consultationRepository,
+      patientRepository,
+      transcriptRepository,
+      s3Client,
+      eventPublisher,
+      logger,
+    }),
   });
 
   const app = express();

@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPrismaClient } from '../src/db/prisma.js';
 import { ConsultationRepository } from '../src/repositories/ConsultationRepository.js';
 import { PatientRepository } from '../src/repositories/PatientRepository.js';
+import { TranscriptRepository } from '../src/repositories/TranscriptRepository.js';
 
 try {
   process.loadEnvFile(fileURLToPath(new URL('../../../.env', import.meta.url)));
@@ -24,11 +25,13 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
   let prisma;
   let patients;
   let consultations;
+  let transcripts;
 
   beforeAll(() => {
     prisma = createPrismaClient(databaseUrl);
     patients = new PatientRepository(prisma);
     consultations = new ConsultationRepository(prisma);
+    transcripts = new TranscriptRepository(prisma);
   });
 
   afterAll(async () => {
@@ -118,6 +121,47 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
     await prisma.soapNote.create({ data: { consultationId, plan: 'Rest', aiResult } });
 
     expect((await prisma.soapNote.findUnique({ where: { consultationId } })).aiResult).toEqual(aiResult);
+  });
+
+  it('saves an audio part once and counts the parts of a minute', async () => {
+    const patient = await patients.insert(doctorId, newPatient('03000000010'));
+    const { consultationId } = await consultations.create({
+      clinicalPatientId: patient.clinicalPatientId,
+      status: 'recording',
+      startedAt: new Date(),
+    });
+    const part = (partNo) => ({ consultationId, partNo, fileKey: `test/${consultationId}/${partNo}.webm`, durationSec: 10 });
+
+    await consultations.savePart(part(1));
+    await consultations.savePart(part(6));
+    await consultations.savePart(part(7));
+
+    await expect(consultations.savePart(part(1))).rejects.toMatchObject({ code: 'P2002' });
+    expect(await consultations.findPart(consultationId, 1)).toMatchObject({ fileKey: `test/${consultationId}/1.webm` });
+    expect(await consultations.findPart(consultationId, 2)).toBeNull();
+    expect(await consultations.countPartsInRange(consultationId, 1, 6)).toBe(2);
+  });
+
+  it('creates a pending transcript window only once, even when asked at the same time', async () => {
+    const patient = await patients.insert(doctorId, newPatient('03000000011'));
+    const { consultationId } = await consultations.create({
+      clinicalPatientId: patient.clinicalPatientId,
+      status: 'recording',
+      startedAt: new Date(),
+    });
+
+    const created = await Promise.all([
+      transcripts.createPendingWindow(consultationId, 1),
+      transcripts.createPendingWindow(consultationId, 1),
+    ]);
+
+    expect(created.sort()).toEqual([false, true]);
+    expect(await prisma.transcriptWindow.findMany({ where: { consultationId } })).toEqual([
+      expect.objectContaining({ windowNo: 1, status: 'pending', transcriptText: null }),
+    ]);
+
+    await transcripts.deleteWindow(consultationId, 1);
+    expect(await transcripts.createPendingWindow(consultationId, 1)).toBe(true);
   });
 
   it('deletes the audio parts, transcript windows and SOAP note with their consultation', async () => {

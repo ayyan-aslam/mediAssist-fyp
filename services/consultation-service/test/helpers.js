@@ -1,5 +1,6 @@
 import { createLogger } from '@mediassist/common';
 import request from 'supertest';
+import { vi } from 'vitest';
 import { createApp } from '../src/app.js';
 
 export const DOCTOR_ID = 16;
@@ -22,6 +23,8 @@ function uniqueViolation() {
 function createFakeRepositories() {
   const patients = [];
   const consultations = [];
+  const audioParts = [];
+  const windows = [];
 
   const phoneTaken = (doctorId, phone, exceptId) =>
     patients.some((p) => p.doctorId === doctorId && p.phone === phone && p.clinicalPatientId !== exceptId);
@@ -81,17 +84,56 @@ function createFakeRepositories() {
       const { fullName, age, gender, phone, email } = patientOf(row);
       return { clinicalPatient: { fullName, age, gender, phone, email } };
     },
+    async findPart(consultationId, partNo) {
+      return audioParts.find((p) => p.consultationId === consultationId && p.partNo === partNo) ?? null;
+    },
+    async savePart(part) {
+      if (await this.findPart(part.consultationId, part.partNo)) throw uniqueViolation();
+      const row = { audioPartId: audioParts.length + 1, ...part, recordedAt: new Date() };
+      audioParts.push(row);
+      return row;
+    },
+    async countPartsInRange(consultationId, first, last) {
+      return audioParts.filter((p) => p.consultationId === consultationId && p.partNo >= first && p.partNo <= last)
+        .length;
+    },
   };
 
-  return { patients, consultations, patientRepository, consultationRepository };
+  // Like INSERT ... ON CONFLICT DO NOTHING: true only for the call that created the row.
+  const transcriptRepository = {
+    async createPendingWindow(consultationId, windowNo) {
+      if (windows.some((w) => w.consultationId === consultationId && w.windowNo === windowNo)) return false;
+      windows.push({ consultationId, windowNo, status: 'pending' });
+      return true;
+    },
+    async deleteWindow(consultationId, windowNo) {
+      const index = windows.findIndex((w) => w.consultationId === consultationId && w.windowNo === windowNo);
+      if (index >= 0) windows.splice(index, 1);
+    },
+  };
+
+  return {
+    patients,
+    consultations,
+    audioParts,
+    windows,
+    patientRepository,
+    consultationRepository,
+    transcriptRepository,
+  };
 }
 
 export function createTestContext() {
   const fakes = createFakeRepositories();
+  const s3Client = { upload: vi.fn(async (key) => key) };
+  const eventPublisher = { publish: vi.fn(async (type, data) => ({ type, data })) };
   const app = createApp({
     logger: createLogger('test', 'silent'),
     patientRepository: fakes.patientRepository,
     consultationRepository: fakes.consultationRepository,
+    transcriptRepository: fakes.transcriptRepository,
+    s3Client,
+    eventPublisher,
   });
 
   // A request with the headers the API Gateway adds after it checks the token and the role.
@@ -101,5 +143,5 @@ export function createTestContext() {
     patch: (url) => request(app).patch(url).set('x-user-id', String(doctorId)).set('x-user-role', role),
   });
 
-  return { app, as, ...fakes };
+  return { app, as, s3Client, eventPublisher, ...fakes };
 }
