@@ -172,6 +172,16 @@ function createFakeRepositories() {
       const note = noteOf(consultationId);
       return { soapNote: note && { ...note } };
     },
+    async findForPdf(consultationId, doctorId) {
+      const consultation = consultationOf(doctorId, consultationId);
+      if (!consultation) return null;
+      const { fullName, age, gender, phone } = patientOf(consultation);
+      return {
+        startedAt: consultation.startedAt,
+        clinicalPatient: { fullName, age, gender, phone },
+        soapNote: noteOf(consultationId),
+      };
+    },
     async update(consultationId, doctorId, changes) {
       const note = consultationOf(doctorId, consultationId) && noteOf(consultationId);
       if (!note) return null;

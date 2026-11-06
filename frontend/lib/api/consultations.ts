@@ -114,4 +114,8 @@ export const consultationsApi = {
       silent: true,
       keepalive,
     }),
+
+  // Made by the server on download, never stored.
+  downloadSoapNotePdf: (consultationId: number) =>
+    api<Blob>(`/consultations/${consultationId}/soap-note/pdf`, { silent: true, responseType: "blob" }),
 };
