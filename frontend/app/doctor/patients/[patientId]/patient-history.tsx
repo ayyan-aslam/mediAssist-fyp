@@ -122,10 +122,10 @@ function PatientCard({ patient }: { patient: ClinicalPatient }) {
           <dt className="sr-only">Phone</dt>
           <dd className="truncate font-medium tabular-nums">{patient.phone}</dd>
         </div>
-        <div className="flex min-w-0 items-center gap-2">
-          <Mail aria-hidden="true" className="size-4 shrink-0 opacity-80" />
+        <div className="flex min-w-0 items-start gap-2">
+          <Mail aria-hidden="true" className="mt-0.5 size-4 shrink-0 opacity-80" />
           <dt className="sr-only">Email</dt>
-          <dd dir={patient.email ? "ltr" : undefined} className="truncate font-medium">
+          <dd dir={patient.email ? "ltr" : undefined} className="min-w-0 font-medium break-all">
             {patient.email ?? <span className="font-normal opacity-80">No email saved</span>}
           </dd>
         </div>
