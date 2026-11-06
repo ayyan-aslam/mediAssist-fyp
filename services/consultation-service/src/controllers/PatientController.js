@@ -14,10 +14,16 @@ export class PatientController {
     res.status(201).json(await this.patientService.create(doctorId, data));
   };
 
-  findByPhone = async (req, res) => {
+  // With ?phone= it finds one saved patient; without it, it lists the doctor's patients (optional ?q=).
+  findOrList = async (req, res) => {
     const doctorId = currentDoctorId(req);
-    const { phone } = this.requestValidator.validateFindPatient(req.query);
-    res.json(await this.patientService.findByPhone(doctorId, phone));
+    if (req.query.phone !== undefined) {
+      const { phone } = this.requestValidator.validateFindPatient(req.query);
+      res.json(await this.patientService.findByPhone(doctorId, phone));
+      return;
+    }
+    const query = this.requestValidator.validatePatientList(req.query);
+    res.json(await this.patientService.list(doctorId, query));
   };
 
   getById = async (req, res) => {

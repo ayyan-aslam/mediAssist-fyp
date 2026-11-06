@@ -111,10 +111,53 @@ describe('clinic patients', () => {
     });
 
     it.each([
-      ['no phone', '/clinical-patients'],
+      ['an empty phone', '/clinical-patients?phone='],
       ['a wrong phone', '/clinical-patients?phone=abc'],
     ])('returns 400 VALIDATION_ERROR for %s', async (_, url) => {
       const res = await ctx.as().get(url);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('GET /clinical-patients (list)', () => {
+    beforeEach(async () => {
+      await addPatient();
+      await addPatient({ ...validPatient, fullName: 'Ayesha Khan', phone: '03001112233' });
+      // The other doctor's patient with the same name: never in this doctor's list.
+      await ctx.as(OTHER_DOCTOR_ID).post('/clinical-patients').send(validPatient);
+      ctx.patients.forEach((p, i) => (p.createdAt = new Date(Date.UTC(2026, 9, 7 + i, 9))));
+    });
+
+    it('lists only the doctor’s own patients, newest first, as a paged list', async () => {
+      const res = await ctx.as().get('/clinical-patients');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        items: [
+          expect.objectContaining({ clinicalPatientId: 2, fullName: 'Ayesha Khan', createdAt: '2026-10-08T09:00:00.000Z' }),
+          expect.objectContaining({ clinicalPatientId: 1, fullName: 'Bilal Hussain', email: null, age: 45, gender: 'male' }),
+        ],
+        page: 1,
+        pageSize: 20,
+        total: 2,
+      });
+    });
+
+    it('filters by part of the name or phone with q', async () => {
+      expect((await ctx.as().get('/clinical-patients?q=BIL')).body.items.map((p) => p.clinicalPatientId)).toEqual([1]);
+      expect((await ctx.as().get('/clinical-patients?q=1112')).body.items.map((p) => p.clinicalPatientId)).toEqual([2]);
+      expect((await ctx.as().get('/clinical-patients?q=zzz')).body).toEqual({ items: [], page: 1, pageSize: 20, total: 0 });
+    });
+
+    it('returns the asked page', async () => {
+      const res = await ctx.as().get('/clinical-patients?page=2&pageSize=1');
+      expect(res.body).toMatchObject({ page: 2, pageSize: 1, total: 2 });
+      expect(res.body.items.map((p) => p.clinicalPatientId)).toEqual([1]);
+    });
+
+    it.each(['q=b', 'q=', 'page=0', 'pageSize=101'])('returns 400 VALIDATION_ERROR for "%s"', async (query) => {
+      const res = await ctx.as().get(`/clinical-patients?${query}`);
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });

@@ -6,9 +6,12 @@ import type {
   CreateClinicalPatientRequest,
   FindClinicalPatientResponse,
   FinishEditingResponse,
+  Paged,
+  PatientSoapNoteItem,
   RetryConsultationResponse,
   SoapNote,
   SoapNoteChanges,
+  SoapNoteListItem,
   StartConsultationResponse,
   StopConsultationResponse,
   UpdateClinicalPatientRequest,
@@ -18,7 +21,16 @@ import type {
 export const consultationQueryKey = (consultationId: number) => ["consultations", consultationId] as const;
 export const patientByPhoneQueryKey = (phone: string) => ["clinical-patients", "by-phone", phone] as const;
 export const patientQueryKey = (patientId: number) => ["clinical-patients", patientId] as const;
+export const patientsQueryKey = (q: string) => ["clinical-patients", "list", q] as const;
+export const patientSoapNotesQueryKey = (patientId: number) => ["clinical-patients", patientId, "soap-notes"] as const;
+export const recentSoapNotesQueryKey = ["soap-notes", "recent"] as const;
+export const soapNoteSearchQueryKey = (q: string) => ["soap-notes", "search", q] as const;
 export const soapNoteQueryKey = (consultationId: number) => ["consultations", consultationId, "soap-note"] as const;
+
+const query = (params: Record<string, string | number | undefined>) =>
+  new URLSearchParams(
+    Object.entries(params).flatMap(([key, value]) => (value === undefined || value === "" ? [] : [[key, String(value)]])),
+  ).toString();
 
 // Consultation Service endpoints (design doc Section 5.5).
 // Silent: the screens show these errors themselves (next to the field, or as a toast).
@@ -28,6 +40,24 @@ export const consultationsApi = {
 
   createPatient: (body: CreateClinicalPatientRequest) =>
     api<ClinicalPatient>("/clinical-patients", { method: "POST", body, silent: true }),
+
+  // The doctor's patients, newest first. q (at least 2 characters) filters by name or phone.
+  listPatients: ({ q, page, pageSize }: { q?: string; page: number; pageSize: number }) =>
+    api<Paged<ClinicalPatient>>(`/clinical-patients?${query({ q, page, pageSize })}`, { silent: true }),
+
+  // Every consultation of the patient, newest first.
+  listPatientSoapNotes: (patientId: number, { page, pageSize }: { page: number; pageSize: number }) =>
+    api<Paged<PatientSoapNoteItem>>(`/clinical-patients/${patientId}/soap-notes?${query({ page, pageSize })}`, {
+      silent: true,
+    }),
+
+  // The doctor's latest SOAP notes, newest first.
+  listRecentSoapNotes: (pageSize: number) =>
+    api<Paged<SoapNoteListItem>>(`/soap-notes?${query({ page: 1, pageSize })}`, { silent: true }),
+
+  // By part of the patient's name or phone (at least 2 characters).
+  searchSoapNotes: ({ q, page, pageSize }: { q: string; page: number; pageSize: number }) =>
+    api<Paged<SoapNoteListItem>>(`/soap-notes/search?${query({ q, page, pageSize })}`, { silent: true }),
 
   getPatient: (patientId: number) => api<ClinicalPatient>(`/clinical-patients/${patientId}`, { silent: true }),
 

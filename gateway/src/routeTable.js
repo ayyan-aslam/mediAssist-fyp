@@ -22,6 +22,7 @@ export const ROUTES = [
   { method: 'GET', path: '/clinical-patients/:patientId', service: 'consultation', roles: DOCTOR },
   { method: 'PATCH', path: '/clinical-patients/:patientId', service: 'consultation', roles: DOCTOR },
   { method: 'GET', path: '/clinical-patients/:patientId/soap-notes', service: 'consultation', roles: DOCTOR },
+  { method: 'GET', path: '/soap-notes', service: 'consultation', roles: DOCTOR },
   { method: 'GET', path: '/soap-notes/search', service: 'consultation', roles: DOCTOR },
   { method: 'POST', path: '/consultations', service: 'consultation', roles: DOCTOR },
   // Before /consultations/:consultationId, so "events" is not read as an ID.

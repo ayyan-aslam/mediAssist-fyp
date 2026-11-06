@@ -37,6 +37,13 @@ export class SoapNoteController {
     res.json(await this.soapNoteHistoryService.listForPatient(doctorId, patientId, paging));
   };
 
+  // The doctor's latest SOAP notes, newest first (the "Recent notes" card).
+  listRecent = async (req, res) => {
+    const doctorId = currentDoctorId(req);
+    const paging = this.requestValidator.validateList(req.query);
+    res.json(await this.soapNoteHistoryService.search(doctorId, paging));
+  };
+
   search = async (req, res) => {
     const doctorId = currentDoctorId(req);
     const query = this.requestValidator.validateSearch(req.query);

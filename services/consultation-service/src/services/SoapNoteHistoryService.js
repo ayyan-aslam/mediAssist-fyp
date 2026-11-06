@@ -4,7 +4,8 @@ import { patientNotFoundError } from '../errors.js';
 const toDate = (date) => date.toISOString().slice(0, 10);
 
 // A patient's previous SOAP notes and the SOAP note search (design doc 5.5, FR-11 and FR-12).
-// Both are paged lists (5.1.2) and cover only the doctor's own patients.
+// The doctor's latest notes (GET /soap-notes) use the search without q.
+// All are paged lists (5.1.2) and cover only the doctor's own patients.
 export class SoapNoteHistoryService {
   constructor({ soapNoteRepository, patientRepository }) {
     this.soapNoteRepository = soapNoteRepository;
@@ -24,6 +25,7 @@ export class SoapNoteHistoryService {
     return { items, page, pageSize, total };
   }
 
+  // q is undefined for GET /soap-notes: the doctor's latest notes.
   async search(doctorId, { q, page, pageSize }) {
     const { rows, total } = await this.soapNoteRepository.search(doctorId, q, { page, pageSize });
     const items = rows.map((row) => ({

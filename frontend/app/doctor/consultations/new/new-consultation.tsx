@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { CircleAlert, CircleCheck, Mail, Mic, Pencil, RotateCw, UserRoundPlus } from "lucide-react";
 import { toast } from "sonner";
@@ -14,14 +13,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useStartConsultation } from "@/hooks/use-start-consultation";
 import { ApiError } from "@/lib/api/client";
 import { consultationsApi, patientByPhoneQueryKey } from "@/lib/api/consultations";
 import type { ClinicalPatient, CreateClinicalPatientRequest, FindClinicalPatientResponse } from "@/lib/api/types";
+import { GENDER_LABEL, initials } from "@/lib/format";
 import { normalizePkPhone, PK_PHONE_EXAMPLE } from "@/lib/phone";
 import { PatientForm, type PatientDetails } from "./patient-form";
 
 const LOOKUP_DELAY_MS = 400;
-const GENDER_LABEL = { male: "Male", female: "Female", other: "Other" } as const;
 
 // Soft fade and rise between the steps. Reduced motion is handled by MotionConfig.
 const step = {
@@ -145,16 +145,6 @@ export function NewConsultation() {
       </div>
     </PageTransition>
   );
-}
-
-// Starts the consultation and opens the recording page. The button stays busy until the page changes.
-function useStartConsultation() {
-  const router = useRouter();
-  return useMutation({
-    mutationFn: consultationsApi.start,
-    onSuccess: ({ consultationId }) => router.push(`/doctor/consultations/${consultationId}/record`),
-    onError: (err) => toast.error(`The recording could not be started. ${err.message}`),
-  });
 }
 
 function StartButton({ onClick, busy }: { onClick: () => void; busy: boolean }) {
@@ -310,9 +300,4 @@ function NewPatient({ phone, onPhoneTaken }: { phone: string; onPhoneTaken: (mes
       <p className="text-center text-sm text-muted-foreground">English, Urdu and Punjabi. Up to 30 minutes.</p>
     </div>
   );
-}
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  return (parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "");
 }

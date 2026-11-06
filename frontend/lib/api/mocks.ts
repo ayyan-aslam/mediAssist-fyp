@@ -15,6 +15,7 @@
 //   Patients added or edited here are kept until the page is reloaded.
 // - Recording: every audio part is saved (201) and stop always succeeds.
 // - SOAP note: every consultation has the doc example note. Saved changes are kept until the page is reloaded.
+// - Patients, history, recent notes and search: every saved patient has one note (consultation 41, the doc example).
 
 const DOCTOR = {
   userId: 16,
@@ -56,6 +57,24 @@ const SOAP_NOTE = {
   updatedAt: "2026-10-07T09:19:12Z",
 };
 let soapNoteChanged = false;
+
+// A paged list (design doc 5.1.2) of the given rows.
+function paged(rows: unknown[], query: URLSearchParams): [number, unknown] {
+  const page = Number(query.get("page") ?? 1);
+  const pageSize = Number(query.get("pageSize") ?? 20);
+  return [200, { items: rows.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: rows.length }];
+}
+
+const matches = (patient: Record<string, unknown>, q: string) =>
+  String(patient.fullName).toLowerCase().includes(q.toLowerCase()) || String(patient.phone).includes(q);
+
+// GET /soap-notes and /soap-notes/search items: one note per saved patient.
+const noteItems = (q?: string) =>
+  CLINICAL_PATIENTS.filter((p) => !q || matches(p, q)).map((p) => ({
+    consultationId: SOAP_NOTE.consultationId,
+    date: "2026-10-07",
+    patient: { clinicalPatientId: p.clinicalPatientId, fullName: p.fullName, phone: p.phone },
+  }));
 
 function base64Url(value: object) {
   return btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -133,6 +152,10 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/clinical-patients$/,
     (_, __, query) => {
+      if (!query.has("phone")) {
+        const q = query.get("q");
+        return paged([...CLINICAL_PATIENTS].reverse().filter((p) => !q || matches(p, q)), query);
+      }
       const patient = CLINICAL_PATIENTS.find((p) => p.phone === query.get("phone"));
       return [200, patient ? { found: true, patient } : { found: false, patient: null }];
     },
@@ -164,6 +187,26 @@ const routes: [string, RegExp, Handler][] = [
       if (!patient) return error(404, "PATIENT_NOT_FOUND", "This patient was not found.");
       Object.assign(patient, body);
       return [200, patient];
+    },
+  ],
+  [
+    "GET",
+    /^\/clinical-patients\/(\d+)\/soap-notes$/,
+    (_, [id], query) => {
+      if (!CLINICAL_PATIENTS.some((p) => p.clinicalPatientId === Number(id)))
+        return error(404, "PATIENT_NOT_FOUND", "This patient was not found.");
+      const item = { consultationId: SOAP_NOTE.consultationId, date: "2026-10-07", status: "completed", assessment: SOAP_NOTE.assessment };
+      return paged([item], query);
+    },
+  ],
+  ["GET", /^\/soap-notes$/, (_, __, query) => paged(noteItems(), query)],
+  [
+    "GET",
+    /^\/soap-notes\/search$/,
+    (_, __, query) => {
+      const q = (query.get("q") ?? "").trim();
+      if (q.length < 2) return error(400, "VALIDATION_ERROR", "q: Too small: expected string to have >=2 characters");
+      return paged(noteItems(q), query);
     },
   ],
   ["POST", /^\/consultations$/, () => [201, { consultationId: 41, status: "recording", startedAt: new Date().toISOString() }]],

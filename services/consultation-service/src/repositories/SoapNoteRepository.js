@@ -1,4 +1,5 @@
 import { Prisma } from '../../generated/prisma/client.ts';
+import { likePattern } from './likePattern.js';
 
 // Thrown inside the transaction to roll it back when the consultation moved on (another attempt, or done).
 class StaleAnswer extends Error {}
@@ -127,15 +128,17 @@ export class SoapNoteRepository {
     return { rows, total };
   }
 
-  // SOAP notes whose patient name or phone contains q (ILIKE '%q%', served by the trigram indexes),
-  // only of this doctor's patients, newest first. % and _ in q are matched as plain characters.
+  // The doctor's SOAP notes, newest first. With q, only notes whose patient name or phone contains q
+  // (ILIKE '%q%', served by the trigram indexes). Without q, all of them (GET /soap-notes).
   async search(doctorId, q, { page, pageSize }) {
-    const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+    const nameOrPhone = q
+      ? Prisma.sql`AND (p.full_name ILIKE ${likePattern(q)} OR p.phone ILIKE ${likePattern(q)})`
+      : Prisma.empty;
     const match = Prisma.sql`
       FROM soap_note s
       JOIN consultation c ON c.consultation_id = s.consultation_id
       JOIN clinical_patient p ON p.clinical_patient_id = c.clinical_patient_id
-      WHERE p.doctor_id = ${doctorId} AND (p.full_name ILIKE ${pattern} OR p.phone ILIKE ${pattern})`;
+      WHERE p.doctor_id = ${doctorId} ${nameOrPhone}`;
     const [rows, [{ total }]] = await Promise.all([
       this.prisma.$queryRaw`
         SELECT c.consultation_id AS "consultationId", c.started_at AS "startedAt",

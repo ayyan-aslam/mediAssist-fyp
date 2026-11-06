@@ -16,7 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { SOAP_PARTS, useSoapNoteEditor, type SaveState } from "@/hooks/use-soap-note-editor";
 import { ApiError } from "@/lib/api/client";
 import { consultationQueryKey, consultationsApi, patientQueryKey, soapNoteQueryKey } from "@/lib/api/consultations";
-import type { Consultation, Gender, SoapNote, SoapPart } from "@/lib/api/types";
+import type { Consultation, SoapNote, SoapPart } from "@/lib/api/types";
+import { GENDER_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // A SOAP part is at most 10,000 characters (Consultation Service check).
@@ -29,8 +30,6 @@ const PARTS: Record<SoapPart, { title: string; hint: string }> = {
   assessment: { title: "Assessment", hint: "Your diagnosis." },
   plan: { title: "Plan", hint: "Medicines, tests, advice and follow-up." },
 };
-
-const GENDER_LABEL: Record<Gender, string> = { male: "Male", female: "Female", other: "Other" };
 
 const notRetried404Or409 = (count: number, err: Error) =>
   !(err instanceof ApiError && (err.status === 404 || err.status === 409)) && count < 2;
