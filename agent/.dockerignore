@@ -1,0 +1,11 @@
+# Keep the image small and free of secrets and patient data.
+.venv
+**/__pycache__
+.pytest_cache
+.env
+data
+eval
+inbox
+outbox
+samples
+tests
