@@ -90,6 +90,25 @@ services:
       retries: 5
       start_period: 30s
 
+  # AI Pipeline (agent/). Starts only with: docker compose --profile services up -d --build
+  # (in daily work it runs on the host: python -m mediassist_agent.run --rabbitmq in agent\).
+  # It only connects: until the Consultation Service has created the queues, it tries again every 5 seconds.
+  agent:
+    profiles: ["services"]
+    build:
+      context: ./agent
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Same logins as in .env, but the hosts are the Docker service names.
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      MEDICINE_AI_DATABASE_URL: postgresql://medicine_ai_service:${MEDICINE_AI_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
 volumes:
   postgres-data:
   rabbitmq-data:

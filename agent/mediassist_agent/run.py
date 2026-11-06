@@ -3,6 +3,7 @@
   python -m mediassist_agent.run --file samples/sample_consultation_01.txt   # one file, print JSON
   python -m mediassist_agent.run --once                                      # process everything in inbox/pending
   python -m mediassist_agent.run --watch                                     # keep polling inbox/pending
+  python -m mediassist_agent.run --rabbitmq                                  # the system: read transcript.ready
 """
 from __future__ import annotations
 
@@ -42,8 +43,15 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--file", type=Path, help="Run one transcript file and print the SOAP JSON")
     g.add_argument("--once", action="store_true", help="Process all transcripts in inbox/pending, then exit")
     g.add_argument("--watch", action="store_true", help="Keep polling inbox/pending")
+    g.add_argument("--rabbitmq", action="store_true", help="Read transcript.ready from RabbitMQ and answer it")
     ap.add_argument("--consultation-id", default=None)
     a = ap.parse_args(argv)
+
+    if a.rabbitmq:
+        from .sources.rabbitmq import TranscriptConsumer
+
+        TranscriptConsumer().start()
+        return 0
 
     if a.file:
         from .graph import run_consultation
