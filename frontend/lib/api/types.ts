@@ -145,6 +145,31 @@ export interface RetryConsultationResponse {
   status: "processing";
 }
 
+// GET /consultations/{consultationId}/soap-note
+export interface SoapNote {
+  soapNoteId: number;
+  consultationId: number;
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+  updatedAt: string;
+}
+
+export type SoapPart = "subjective" | "objective" | "assessment" | "plan";
+
+// PATCH /consultations/{consultationId}/soap-note: only the parts that changed.
+export type SoapNoteChanges = Partial<Record<SoapPart, string>>;
+
+export interface UpdateSoapNoteResponse {
+  updatedAt: string;
+}
+
+// POST /consultations/{consultationId}/soap-note/finish-editing
+export interface FinishEditingResponse {
+  changed: boolean;
+}
+
 // GET /consultations/events (SSE): the data line of each event.
 export type ConsultationEvent =
   | { event: "soap_ready"; data: { consultationId: number } }

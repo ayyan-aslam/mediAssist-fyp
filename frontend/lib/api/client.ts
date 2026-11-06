@@ -26,6 +26,8 @@ export interface ApiOptions {
   auth?: boolean;
   // true when the caller shows the error itself, so no toast is shown.
   silent?: boolean;
+  // true for requests that must finish after the page is closed (fetch keepalive).
+  keepalive?: boolean;
 }
 
 const NETWORK_ERROR_MESSAGE = "Cannot reach the server. Check your internet connection and try again.";
@@ -49,6 +51,7 @@ function send(path: string, options: ApiOptions, token: string | null) {
     method: options.method ?? "GET",
     headers,
     body: options.body === undefined ? undefined : isForm ? (options.body as FormData) : JSON.stringify(options.body),
+    keepalive: options.keepalive,
   };
   return env.useMocks ? mockFetch(path, init) : fetch(`${env.apiUrl}${path}`, init);
 }
