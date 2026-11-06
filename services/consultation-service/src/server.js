@@ -1,10 +1,12 @@
-import { RabbitConnection, setupTopology } from '@mediassist/common';
+import { EventPublisher, RabbitConnection, setupTopology } from '@mediassist/common';
 import { createApp } from './app.js';
+import { S3Client } from './clients/S3Client.js';
 import { config } from './config.js';
 import { createPrismaClient } from './db/prisma.js';
 import { logger } from './logger.js';
 import { ConsultationRepository } from './repositories/ConsultationRepository.js';
 import { PatientRepository } from './repositories/PatientRepository.js';
+import { TranscriptRepository } from './repositories/TranscriptRepository.js';
 
 // The config is checked on import (./config.js). Then RabbitMQ, then the HTTP server.
 const prisma = createPrismaClient(config.CONSULTATION_DATABASE_URL);
@@ -27,6 +29,14 @@ const app = createApp({
   logger,
   patientRepository: new PatientRepository(prisma),
   consultationRepository: new ConsultationRepository(prisma),
+  transcriptRepository: new TranscriptRepository(prisma),
+  s3Client: new S3Client({
+    region: config.AWS_REGION,
+    accessKeyId: config.AWS_ACCESS_KEY_ID,
+    secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
+    bucket: config.S3_BUCKET_NAME,
+  }),
+  eventPublisher: new EventPublisher({ connection: rabbit, source: 'consultation-service', logger }),
 });
 
 const server = app.listen(config.CONSULTATION_SERVICE_PORT, (err) => {

@@ -20,6 +20,20 @@ export class ConsultationController {
     res.json(await this.consultationService.getById(doctorId, consultationId));
   };
 
+  // 201 for a new part, 200 when the part was already saved. The body is the same.
+  uploadPart = async (req, res) => {
+    const doctorId = currentDoctorId(req);
+    const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);
+    const { partNo, durationSec } = this.requestValidator.validateAudioPart(req.body, req.file);
+    const { created } = await this.consultationService.savePart(doctorId, consultationId, {
+      partNo,
+      durationSec,
+      audio: req.file.buffer,
+      contentType: req.file.mimetype,
+    });
+    res.status(created ? 201 : 200).json({ partNo, saved: true });
+  };
+
   // Internal (Prescription Service). The gateway does not expose /internal routes, so there is no user.
   getPatientContact = async (req, res) => {
     const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { audioUpload } from './middleware/audioUpload.js';
 
 // Endpoints: design doc Section 5.5.
 export function createRouter({ patientController, consultationController }) {
@@ -10,6 +11,7 @@ export function createRouter({ patientController, consultationController }) {
   router.patch('/clinical-patients/:patientId', patientController.update);
 
   router.post('/consultations', consultationController.start);
+  router.post('/consultations/:consultationId/audio-parts', audioUpload, consultationController.uploadPart);
   router.get('/consultations/:consultationId', consultationController.getById);
 
   router.get('/internal/consultations/:consultationId/patient-contact', consultationController.getPatientContact);
