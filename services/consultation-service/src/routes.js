@@ -11,6 +11,8 @@ export function createRouter({ patientController, consultationController }) {
   router.patch('/clinical-patients/:patientId', patientController.update);
 
   router.post('/consultations', consultationController.start);
+  // Before /consultations/:consultationId, so "events" is not read as an ID.
+  router.get('/consultations/events', consultationController.events);
   router.post('/consultations/:consultationId/audio-parts', audioUpload, consultationController.uploadPart);
   router.post('/consultations/:consultationId/stop', consultationController.stop);
   router.post('/consultations/:consultationId/retry', consultationController.retry);
