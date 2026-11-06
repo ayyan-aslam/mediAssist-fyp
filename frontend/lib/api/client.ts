@@ -5,11 +5,13 @@ import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "@/lib/a
 import type { ApiErrorBody, RefreshResponse } from "@/lib/api/types";
 
 // Error thrown by api() when the backend answers with the shared error shape (design doc 5.1.3).
+// `details` holds the extra fields some errors carry, like `missingParts` of PARTS_MISSING.
 export class ApiError extends Error {
   constructor(
     public status: number,
     public code: string,
     message: string,
+    public details: Record<string, unknown> = {},
   ) {
     super(message);
     this.name = "ApiError";
@@ -18,6 +20,7 @@ export class ApiError extends Error {
 
 export interface ApiOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+  // A FormData body is sent as multipart/form-data, anything else as JSON.
   body?: unknown;
   // false for public routes (sign-up, login, refresh): no token and no refresh on 401.
   auth?: boolean;
@@ -37,23 +40,27 @@ export function setSessionExpiredHandler(handler: () => void) {
 
 function send(path: string, options: ApiOptions, token: string | null) {
   const headers: Record<string, string> = {};
-  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+  const isForm = options.body instanceof FormData;
+  // For FormData the browser sets the multipart Content-Type with its boundary.
+  if (options.body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const init: RequestInit = {
     method: options.method ?? "GET",
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: options.body === undefined ? undefined : isForm ? (options.body as FormData) : JSON.stringify(options.body),
   };
   return env.useMocks ? mockFetch(path, init) : fetch(`${env.apiUrl}${path}`, init);
 }
 
 async function readError(res: Response) {
   const body = (await res.json().catch(() => null)) as ApiErrorBody | null;
+  const { code, message, ...details } = body?.error ?? ({} as Partial<ApiErrorBody["error"]>);
   return new ApiError(
     res.status,
-    body?.error?.code ?? "UNKNOWN_ERROR",
-    body?.error?.message ?? "Something went wrong. Please try again.",
+    code ?? "UNKNOWN_ERROR",
+    message ?? "Something went wrong. Please try again.",
+    details,
   );
 }
 
