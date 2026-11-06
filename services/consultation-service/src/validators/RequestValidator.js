@@ -46,6 +46,26 @@ const audioPartSchema = z.object({
 // Up to 180 parts: 30 minutes (design doc 3.4.4).
 const stopSchema = z.object({ totalParts: z.int().positive().max(180) });
 
+// PATCH soap-note: only the parts that changed, at least one. An empty part (null) is saved as "".
+const soapPart = z
+  .string()
+  .max(10_000)
+  .nullable()
+  .optional()
+  .transform((value) => (value === null ? '' : value));
+const soapNoteChangesSchema = z
+  .strictObject({ subjective: soapPart, objective: soapPart, assessment: soapPart, plan: soapPart })
+  .refine((changes) => Object.values(changes).some((value) => value !== undefined), 'send at least one part');
+
+// Lists and pages (design doc 5.1.2). Query values arrive as strings.
+const pageSchema = {
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+};
+const listSchema = z.object(pageSchema);
+// SOAP note search by patient name or phone: at least 2 characters.
+const searchSchema = z.object({ q: z.string().trim().min(2).max(100), ...pageSchema });
+
 function parse(schema, data) {
   const result = schema.safeParse(data ?? {});
   if (!result.success) {
@@ -81,6 +101,19 @@ export class RequestValidator {
 
   validateStop(body) {
     return parse(stopSchema, body);
+  }
+
+  validateSoapNoteChanges(body) {
+    const changes = parse(soapNoteChangesSchema, body);
+    return Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined));
+  }
+
+  validateList(query) {
+    return parse(listSchema, query);
+  }
+
+  validateSearch(query) {
+    return parse(searchSchema, query);
   }
 
   // An ID in the URL. A value that is not a valid ID cannot exist, so notFoundError() is thrown.

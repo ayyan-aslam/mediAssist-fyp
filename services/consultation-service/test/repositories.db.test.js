@@ -340,6 +340,78 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
     expect((await read(notSent.consultationId)).status).toBe('processing');
   });
 
+  it('reads and updates a SOAP note only for its doctor, saving only the sent parts', async () => {
+    const { consultationId } = await newConsultation('completed');
+    expect(await soapNotes.findSoapNote(consultationId, doctorId)).toEqual({ soapNote: null });
+    expect(await soapNotes.update(consultationId, doctorId, { plan: 'x' })).toBeNull();
+    const created = await prisma.soapNote.create({
+      data: { consultationId, subjective: 'S', objective: 'O', assessment: 'A', plan: 'P', aiResult: { a: 1 } },
+    });
+
+    expect(await soapNotes.findSoapNote(consultationId, otherDoctorId)).toBeNull();
+    expect(await soapNotes.update(consultationId, otherDoctorId, { plan: 'Hacked' })).toBeNull();
+    const { soapNote } = await soapNotes.findSoapNote(consultationId, doctorId);
+    expect(soapNote).toMatchObject({ soapNoteId: created.soapNoteId, plan: 'P' });
+    expect(soapNote).not.toHaveProperty('aiResult');
+
+    const updatedAt = await soapNotes.update(consultationId, doctorId, { plan: 'Panadol – کھانے کے بعد' });
+
+    expect(updatedAt > created.updatedAt).toBe(true);
+    expect(await prisma.soapNote.findUnique({ where: { consultationId } })).toMatchObject({
+      subjective: 'S',
+      plan: 'Panadol – کھانے کے بعد',
+      aiResult: { a: 1 },
+      updatedAt,
+    });
+  });
+
+  it('lists a patient’s consultations newest first with the assessment, paged', async () => {
+    const patient = await patients.insert(doctorId, newPatient('03000000014'));
+    const ids = [];
+    for (const day of [7, 9, 8]) {
+      const c = await consultations.create({
+        clinicalPatientId: patient.clinicalPatientId,
+        status: 'completed',
+        startedAt: new Date(Date.UTC(2026, 9, day, 9)),
+      });
+      await prisma.soapNote.create({ data: { consultationId: c.consultationId, assessment: `Day ${day}` } });
+      ids.push(c.consultationId);
+    }
+
+    const first = await soapNotes.findByPatient(doctorId, patient.clinicalPatientId, { page: 1, pageSize: 2 });
+    const second = await soapNotes.findByPatient(doctorId, patient.clinicalPatientId, { page: 2, pageSize: 2 });
+
+    expect(first.total).toBe(3);
+    expect(first.rows.map((r) => r.soapNote.assessment)).toEqual(['Day 9', 'Day 8']);
+    expect(second.rows.map((r) => r.consultationId)).toEqual([ids[0]]);
+    expect(await soapNotes.findByPatient(otherDoctorId, patient.clinicalPatientId, { page: 1, pageSize: 20 })).toEqual({
+      rows: [],
+      total: 0,
+    });
+  });
+
+  it('searches notes by part of the name or phone, only the doctor’s own, with % and _ as plain text', async () => {
+    const mine = await patients.insert(doctorId, { ...newPatient('03219990001'), fullName: 'Zarqa_Search 100%' });
+    const theirs = await patients.insert(otherDoctorId, { ...newPatient('03219990001'), fullName: 'Zarqa_Search 100%' });
+    const noNote = await patients.insert(doctorId, { ...newPatient('03219990002'), fullName: 'Zarqa Without Note' });
+    for (const p of [mine, theirs, noNote]) {
+      const c = await consultations.create({ clinicalPatientId: p.clinicalPatientId, status: 'completed', startedAt: new Date() });
+      if (p !== noNote) await prisma.soapNote.create({ data: { consultationId: c.consultationId } });
+    }
+    const page = { page: 1, pageSize: 20 };
+
+    const byName = await soapNotes.search(doctorId, 'zarqa_s', page);
+    expect(byName.total).toBe(1);
+    expect(byName.rows).toEqual([
+      expect.objectContaining({ clinicalPatientId: mine.clinicalPatientId, fullName: 'Zarqa_Search 100%', phone: '03219990001' }),
+    ]);
+    expect((await soapNotes.search(doctorId, '99900', page)).total).toBe(1);
+    expect((await soapNotes.search(doctorId, '100%', page)).total).toBe(1);
+    // "_" and "%" match only themselves, not any character.
+    expect((await soapNotes.search(doctorId, 'zarqa%note', page)).total).toBe(0);
+    expect((await soapNotes.search(doctorId, 'zarq__', page)).total).toBe(0);
+  });
+
   it('finds all transcript windows in order', async () => {
     const { consultationId } = await newConsultation('processing');
     await transcripts.createPendingWindow(consultationId, 2);
