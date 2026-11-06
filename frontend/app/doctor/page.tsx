@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowRight, FileSearch, FileText, Mic, UserRoundPlus, Users } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
+import { NEW_CONSULTATION_HREF } from "@/components/shared/nav-config";
 import { PageTransition } from "@/components/shared/page-transition";
 import { Waveform } from "@/components/shared/product-previews";
 import { Reveal } from "@/components/shared/reveal";
@@ -57,11 +59,12 @@ export default function DoctorHomePage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button disabled size="lg" className="bg-brand-bright text-navy hover:bg-brand-bright disabled:opacity-70">
-              Start consultation
-              <ArrowRight aria-hidden="true" data-icon="inline-end" />
+            <Button asChild size="lg" className="bg-brand-bright text-navy hover:bg-[color-mix(in_oklch,var(--brand-bright),white_12%)]">
+              <Link href={NEW_CONSULTATION_HREF}>
+                Start consultation
+                <ArrowRight aria-hidden="true" data-icon="inline-end" />
+              </Link>
             </Button>
-            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">Coming soon</span>
           </div>
         </Reveal>
 

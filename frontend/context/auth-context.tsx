@@ -7,6 +7,7 @@ import { ApiError, restoreSession, setSessionExpiredHandler } from "@/lib/api/cl
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "@/lib/api/tokens";
 import type { SessionUser } from "@/lib/api/types";
 import { firebaseSignIn, firebaseSignOut, firebaseVerifiedIdToken } from "@/lib/firebase";
+import { loginHref } from "@/lib/redirect";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -19,6 +20,8 @@ export interface AuthContextValue {
   // so the user does not type the password again. Returns null when that user is not verified (or not here).
   loginAfterVerification: () => Promise<SessionUser | null>;
   logout: () => Promise<void>;
+  // After PATCH /users/me: shows the new name in the header at once.
+  updateUser: (changes: Partial<Pick<SessionUser, "fullName">>) => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -65,11 +68,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // A refresh failed inside the API client: log out and go to the login page.
+  // A refresh failed inside the API client: log out and go to the login page (and back here after login).
   useEffect(() => {
     setSessionExpiredHandler(() => {
       endSession();
-      router.replace("/login");
+      router.replace(loginHref());
     });
   }, [endSession, router]);
 
@@ -105,9 +108,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace("/login");
   }, [endSession, router]);
 
+  const updateUser = useCallback((changes: Partial<Pick<SessionUser, "fullName">>) => {
+    setUser((current) => (current ? { ...current, ...changes } : current));
+  }, []);
+
   const value = useMemo(
-    () => ({ user, status, login, loginAfterVerification, logout }),
-    [user, status, login, loginAfterVerification, logout],
+    () => ({ user, status, login, loginAfterVerification, logout, updateUser }),
+    [user, status, login, loginAfterVerification, logout, updateUser],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

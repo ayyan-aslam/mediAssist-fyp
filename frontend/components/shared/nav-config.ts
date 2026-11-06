@@ -1,4 +1,4 @@
-import { FileText, LayoutDashboard, UserRound, Users, type LucideIcon } from "lucide-react";
+import { CirclePlus, LayoutDashboard, Search, UserRound, Users, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   href: string;
@@ -10,12 +10,15 @@ export interface NavItem {
 
 export type Area = "doctor";
 
-// Side menu of each area (the first item is the area home). Phase 0 builds only the doctor area.
+export const NEW_CONSULTATION_HREF = "/doctor/consultations/new";
+
+// Side menu of each area (the first item is the area home). Only the doctor area has a menu so far.
 export const navByArea: Record<Area, NavItem[]> = {
   doctor: [
     { href: "/doctor", label: "Home", icon: LayoutDashboard },
-    { href: "/doctor/patients", label: "Patients", icon: Users, soon: true },
-    { href: "/doctor/soap-notes", label: "SOAP notes", icon: FileText, soon: true },
-    { href: "/doctor/profile", label: "Profile", icon: UserRound, soon: true },
+    { href: NEW_CONSULTATION_HREF, label: "New consultation", icon: CirclePlus },
+    { href: "/doctor/patients", label: "Patients & notes", icon: Users, soon: true },
+    { href: "/doctor/search", label: "Search", icon: Search, soon: true },
+    { href: "/doctor/profile", label: "Profile", icon: UserRound },
   ],
 };

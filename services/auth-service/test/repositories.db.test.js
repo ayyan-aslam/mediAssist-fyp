@@ -91,6 +91,31 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
     expect(await tokens.findByHash(newHash)).toBeNull();
   });
 
+  it('updates and reads a doctor profile without the CNIC', async () => {
+    const doctor = newDoctor('e');
+    const userId = await users.createUserWithProfile(doctor);
+    const [specialty] = await new SpecialtyRepository(prisma).findAll();
+    const phone = `0${crypto.randomInt(1e9, 1e10)}`;
+
+    await users.updateProfile(userId, 'doctor', {
+      fullName: 'Dr. Updated',
+      phone,
+      profile: { specialtyId: specialty.specialtyId },
+    });
+
+    expect(await users.findProfileById(userId)).toEqual({
+      userId,
+      fullName: 'Dr. Updated',
+      email: doctor.email,
+      phone,
+      role: 'doctor',
+      patientProfile: null,
+      doctorProfile: { registrationNo: doctor.profile.registrationNo, specialty },
+    });
+    expect(await users.findByPhone(phone)).toMatchObject({ userId });
+    expect(await new SpecialtyRepository(prisma).findById(specialty.specialtyId)).toEqual(specialty);
+  });
+
   it('lists the specialities', async () => {
     const items = await new SpecialtyRepository(prisma).findAll();
     expect(Array.isArray(items)).toBe(true);

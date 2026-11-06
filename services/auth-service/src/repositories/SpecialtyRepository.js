@@ -9,4 +9,11 @@ export class SpecialtyRepository {
       orderBy: { specialtyId: 'asc' },
     });
   }
+
+  findById(specialtyId) {
+    return this.prisma.specialty.findUnique({
+      where: { specialtyId },
+      select: { specialtyId: true, name: true },
+    });
+  }
 }

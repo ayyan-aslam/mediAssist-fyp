@@ -1,5 +1,5 @@
 // Mock mode (NEXT_PUBLIC_USE_MOCKS=true): answers with the example responses
-// from design doc Section 5.2, so screens can be built without the backend.
+// from design doc Sections 5.2 and 5.5, so screens can be built without the backend.
 //
 // Two small changes from the doc examples:
 // - /auth/login returns the doctor from the GET /users/me example (the doc example is a patient),
@@ -10,6 +10,9 @@
 // To see the error screens, use these values (messages as in the Auth & User Service):
 // - Sign-up: email taken@example.com, phone 03000000000, CNIC 1111111111111 or registration no PMDC-00000.
 // - Login: unverified@example.com (EMAIL_NOT_VERIFIED) or suspended@example.com (ACCOUNT_SUSPENDED).
+// - Profile: phone 03000000000 (PHONE_TAKEN). Saved changes are kept until the page is reloaded.
+// - New consultation: phone 03214567890 is a saved patient (the doc example). Other numbers are new.
+//   Patients added or edited here are kept until the page is reloaded.
 
 const DOCTOR = {
   userId: 16,
@@ -18,7 +21,7 @@ const DOCTOR = {
   phone: "03111234567",
   role: "doctor",
   registrationNo: "PMDC-12345",
-  specialty: { specialtyId: 3, name: "Cardiologist" },
+  specialty: { specialtyId: 3, name: "Cardiologist" } as { specialtyId: number; name: string } | null,
 };
 
 const SPECIALTIES = [
@@ -37,6 +40,10 @@ const ADMIN_USER = {
   createdAt: "2026-10-01T09:15:00Z",
 };
 
+const CLINICAL_PATIENTS: Record<string, unknown>[] = [
+  { clinicalPatientId: 7, fullName: "Bilal Hussain", phone: "03214567890", email: null, age: 45, gender: "male", createdAt: "2026-10-07T09:00:00Z" },
+];
+
 function base64Url(value: object) {
   return btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
@@ -47,7 +54,7 @@ function mockAccessToken() {
   return `${base64Url({ alg: "none" })}.${base64Url(payload)}.mock`;
 }
 
-type Handler = (body: Record<string, unknown>, params: string[]) => [number, unknown?];
+type Handler = (body: Record<string, unknown>, params: string[], query: URLSearchParams) => [number, unknown?];
 
 const error = (status: number, code: string, message: string): [number, unknown] => [status, { error: { code, message } }];
 
@@ -101,12 +108,44 @@ const routes: [string, RegExp, Handler][] = [
     "PATCH",
     /^\/users\/me$/,
     (body) => {
+      if (body.phone === "03000000000") return error(409, "PHONE_TAKEN", "This phone number is already registered.");
       const { specialtyId, ...rest } = body;
-      const specialty = SPECIALTIES.find((s) => s.specialtyId === specialtyId) ?? DOCTOR.specialty;
-      return [200, { ...DOCTOR, ...rest, specialty }];
+      if (specialtyId !== undefined) DOCTOR.specialty = SPECIALTIES.find((s) => s.specialtyId === specialtyId) ?? null;
+      Object.assign(DOCTOR, rest);
+      return [200, DOCTOR];
     },
   ],
   ["GET", /^\/specialties$/, () => [200, { items: SPECIALTIES }]],
+  [
+    "GET",
+    /^\/clinical-patients$/,
+    (_, __, query) => {
+      const patient = CLINICAL_PATIENTS.find((p) => p.phone === query.get("phone"));
+      return [200, patient ? { found: true, patient } : { found: false, patient: null }];
+    },
+  ],
+  [
+    "POST",
+    /^\/clinical-patients$/,
+    (body) => {
+      if (CLINICAL_PATIENTS.some((p) => p.phone === body.phone))
+        return error(409, "PHONE_ALREADY_SAVED", "You have already saved a patient with this phone number.");
+      const patient = { clinicalPatientId: CLINICAL_PATIENTS.length + 7, ...body, createdAt: new Date().toISOString() };
+      CLINICAL_PATIENTS.push(patient);
+      return [201, patient];
+    },
+  ],
+  [
+    "PATCH",
+    /^\/clinical-patients\/(\d+)$/,
+    (body, [id]) => {
+      const patient = CLINICAL_PATIENTS.find((p) => p.clinicalPatientId === Number(id));
+      if (!patient) return error(404, "PATIENT_NOT_FOUND", "This patient was not found.");
+      Object.assign(patient, body);
+      return [200, patient];
+    },
+  ],
+  ["POST", /^\/consultations$/, () => [201, { consultationId: 41, status: "recording", startedAt: new Date().toISOString() }]],
   ["GET", /^\/admin\/users$/, () => [200, { items: [ADMIN_USER], page: 1, pageSize: 20, total: 1 }]],
   ["GET", /^\/admin\/users\/(\d+)$/, () => [200, ADMIN_USER]],
   ["POST", /^\/admin\/users\/(\d+)\/suspend$/, (_, [id]) => [200, { userId: Number(id), accountStatus: "suspended" }]],
@@ -119,13 +158,13 @@ export async function mockFetch(path: string, init: RequestInit): Promise<Respon
   await new Promise((resolve) => setTimeout(resolve, DELAY_MS));
 
   const method = init.method ?? "GET";
-  const pathname = path.split("?")[0];
+  const [pathname, search = ""] = path.split("?");
   const body = typeof init.body === "string" ? JSON.parse(init.body) : {};
 
   for (const [routeMethod, pattern, handler] of routes) {
     const match = pathname.match(pattern);
     if (routeMethod === method && match) {
-      const [status, data] = handler(body, match.slice(1));
+      const [status, data] = handler(body, match.slice(1), new URLSearchParams(search));
       return new Response(data === undefined ? null : JSON.stringify(data), {
         status,
         headers: { "Content-Type": "application/json" },

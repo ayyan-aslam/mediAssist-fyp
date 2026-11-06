@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Ban, Check, FolderLock, KeyRound, Lock, ScrollText, ShieldCheck } from "lucide-react";
 import { LandingHeader } from "@/components/shared/landing-header";
 import { Logo } from "@/components/shared/logo";
+import { RedirectIfAuthenticated } from "@/components/shared/redirect-if-authenticated";
 import {
   ConsultationPreview,
   DeliveryPreview,
@@ -152,6 +153,7 @@ function FeatureRow({
 export default function LandingPage() {
   return (
     <div className="min-h-dvh bg-background">
+      <RedirectIfAuthenticated />
       <LandingHeader />
 
       <main>

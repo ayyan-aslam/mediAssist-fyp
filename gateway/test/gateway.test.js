@@ -1,43 +1,14 @@
-import { createLogger } from '@mediassist/common';
-import express from 'express';
-import { SignJWT } from 'jose';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApp } from '../src/app.js';
-
-const JWT_SECRET = 'test-secret-that-is-at-least-32-characters';
-const user = { userId: 16, role: 'doctor', name: 'Dr. Sara Ahmed', email: 'sara@example.com' };
-
-function signToken(payload, { secret = JWT_SECRET, expiresIn = '15m' } = {}) {
-  return new SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime(expiresIn)
-    .sign(new TextEncoder().encode(secret));
-}
+import { buildApp, doctor as user, serviceUrl, signToken, startEchoService } from './helpers.js';
 
 // A fake Auth & User Service that sends back what it received.
 let upstream;
 let app;
 
 beforeAll(async () => {
-  const fake = express();
-  fake.use(express.json());
-  fake.use((req, res) => {
-    res.json({ method: req.method, url: req.url, headers: req.headers, body: req.body });
-  });
-  upstream = await new Promise((resolve) => {
-    const server = fake.listen(0, () => resolve(server));
-  });
-
-  app = createApp({
-    config: {
-      JWT_SECRET,
-      FRONTEND_URL: 'http://localhost:3000',
-      AUTH_SERVICE_URL: `http://127.0.0.1:${upstream.address().port}`,
-    },
-    logger: createLogger('test', 'silent'),
-  });
+  upstream = await startEchoService('auth');
+  app = buildApp({ AUTH_SERVICE_URL: serviceUrl(upstream), CONSULTATION_SERVICE_URL: serviceUrl(upstream) });
 });
 
 afterAll(() => {
@@ -65,6 +36,34 @@ describe('public routes', () => {
     const res = await request(app).get('/api/v1/specialties');
     expect(res.status).toBe(200);
     expect(res.body.url).toBe('/specialties');
+  });
+});
+
+describe('profile routes', () => {
+  it('forwards GET /users/me with the user headers', async () => {
+    const token = await signToken(user);
+    const res = await request(app).get('/api/v1/users/me').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.url).toBe('/users/me');
+    expect(res.body.headers['x-user-id']).toBe('16');
+    expect(res.body.headers['x-user-role']).toBe('doctor');
+  });
+
+  it('forwards PATCH /users/me with the body', async () => {
+    const token = await signToken(user);
+    const res = await request(app)
+      .patch('/api/v1/users/me')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ specialtyId: 3 });
+    expect(res.status).toBe(200);
+    expect(res.body.method).toBe('PATCH');
+    expect(res.body.body).toEqual({ specialtyId: 3 });
+  });
+
+  it('returns 401 for /users/me without a token', async () => {
+    const res = await request(app).get('/api/v1/users/me');
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('UNAUTHORIZED');
   });
 });
 
@@ -139,10 +138,7 @@ describe('unknown routes', () => {
 
 describe('service down', () => {
   it('returns 503 when the service does not answer', async () => {
-    const downApp = createApp({
-      config: { JWT_SECRET, FRONTEND_URL: 'http://localhost:3000', AUTH_SERVICE_URL: 'http://127.0.0.1:1' },
-      logger: createLogger('test', 'silent'),
-    });
+    const downApp = buildApp({ AUTH_SERVICE_URL: 'http://127.0.0.1:1', CONSULTATION_SERVICE_URL: 'http://127.0.0.1:1' });
     const res = await request(downApp).get('/api/v1/specialties');
     expect(res.status).toBe(503);
     expect(res.body.error.code).toBe('SERVICE_UNAVAILABLE');

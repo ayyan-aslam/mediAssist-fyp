@@ -17,7 +17,7 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "concurrently --names gateway,auth --prefix-colors cyan,magenta \"npm run dev -w gateway\" \"npm run dev -w services/auth-service\""
+    "dev": "concurrently --names gateway,auth,consultation --prefix-colors cyan,magenta,green \"npm run dev -w gateway\" \"npm run dev -w services/auth-service\" \"npm run dev -w services/consultation-service\""
   },
   "devDependencies": {
     "concurrently": "^10.0.6"

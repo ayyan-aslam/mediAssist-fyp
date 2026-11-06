@@ -27,6 +27,26 @@ const registerSchemas = {
   }),
 };
 
+// PATCH /users/me: only the fields that changed. Unknown fields (email, cnic, ...) are rejected.
+// Patients and doctors only; admins cannot edit their profile (design doc Section 5.2).
+const profileUpdateSchemas = {
+  patient: z.strictObject({
+    fullName: fullName.optional(),
+    phone: phone.optional(),
+    dateOfBirth: z.iso
+      .date()
+      .transform((value) => new Date(value))
+      .nullable()
+      .optional(),
+    gender: z.enum(['male', 'female', 'other']).nullable().optional(),
+  }),
+  doctor: z.strictObject({
+    fullName: fullName.optional(),
+    phone: phone.optional(),
+    specialtyId: z.int().positive().nullable().optional(),
+  }),
+};
+
 const loginSchema = z.object({ firebaseToken: z.string().min(1) });
 const refreshTokenSchema = z.object({ refreshToken: z.string().min(1) });
 
@@ -61,5 +81,13 @@ export class RequestValidator {
 
   validateRefreshToken(body) {
     return parse(refreshTokenSchema, body);
+  }
+
+  validateProfileUpdate(body, role) {
+    const schema = profileUpdateSchemas[role];
+    if (!schema) {
+      throw new AppError(403, 'FORBIDDEN', 'You cannot edit this profile.');
+    }
+    return parse(schema, body);
   }
 }

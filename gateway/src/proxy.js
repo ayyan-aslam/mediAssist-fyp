@@ -12,13 +12,20 @@ function addUserHeaders(proxyReq, req) {
   }
 }
 
-// Forwards the matching requests to one service. The /api/v1 prefix is already removed by the router.
-export function createServiceProxy({ target, pathFilter, logger }) {
+// Tells browsers and any proxy in front of the gateway not to cache, compress or buffer the stream.
+function addSseHeaders(proxyRes) {
+  proxyRes.headers['cache-control'] = 'no-cache, no-transform';
+  proxyRes.headers['x-accel-buffering'] = 'no';
+}
+
+// Forwards a request to one service. The /api/v1 prefix is already removed by the router.
+// sse: true for SSE streams. The response is piped as it arrives, with no timeout.
+export function createServiceProxy({ target, logger, sse = false }) {
   return createProxyMiddleware({
     target,
-    pathFilter,
     on: {
       proxyReq: addUserHeaders,
+      ...(sse && { proxyRes: addSseHeaders }),
       error: (err, req, res) => {
         logger.error({ err, method: req.method, url: req.originalUrl, target }, 'Service is not responding');
         if (!res.headersSent) {

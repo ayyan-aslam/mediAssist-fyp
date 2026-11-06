@@ -53,6 +53,34 @@ services:
       retries: 5
       start_period: 30s
 
+  # Starts only with: docker compose --profile services up -d --build
+  # (in daily work the service runs on the host with npm run dev, on the same port).
+  consultation-service:
+    profiles: ["services"]
+    build:
+      context: .
+      dockerfile: services/consultation-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      # Same login as in .env, but the hosts are the Docker service names.
+      CONSULTATION_DATABASE_URL: postgresql://consultation_service:${CONSULTATION_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=consultationdb
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      CONSULTATION_SERVICE_PORT: 3002
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "127.0.0.1:${CONSULTATION_SERVICE_PORT:-3002}:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 volumes:
   postgres-data:
   rabbitmq-data:

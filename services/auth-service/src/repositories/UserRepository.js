@@ -1,5 +1,6 @@
 // The profile table that belongs to each role.
 const PROFILE_RELATION = {
+  patient: 'patientProfile',
   doctor: 'doctorProfile',
 };
 
@@ -59,5 +60,38 @@ export class UserRepository {
 
   findById(userId) {
     return this.prisma.user.findUnique({ where: { userId } });
+  }
+
+  findByPhone(phone) {
+    return this.prisma.user.findUnique({ where: { phone } });
+  }
+
+  // The user with the profile of their role. The CNIC columns are never selected.
+  findProfileById(userId) {
+    return this.prisma.user.findUnique({
+      where: { userId },
+      select: {
+        userId: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        role: true,
+        patientProfile: { select: { dateOfBirth: true, gender: true } },
+        doctorProfile: {
+          select: { registrationNo: true, specialty: { select: { specialtyId: true, name: true } } },
+        },
+      },
+    });
+  }
+
+  // Updates USERS and the role's profile in one query. Prisma skips fields that are undefined.
+  async updateProfile(userId, role, { fullName, phone, profile }) {
+    const data = { fullName, phone };
+    if (Object.keys(profile).length > 0) {
+      // A doctor always has a profile row. A patient who signed up with Google may not have one yet.
+      data[PROFILE_RELATION[role]] =
+        role === 'patient' ? { upsert: { create: profile, update: profile } } : { update: profile };
+    }
+    await this.prisma.user.update({ where: { userId }, data });
   }
 }

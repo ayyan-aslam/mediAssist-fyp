@@ -19,10 +19,7 @@ import { authApi } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { startVerificationEmail } from "@/lib/firebase";
 import { passwordRules, passwordSchema } from "@/lib/password";
-
-// Same rules as the Auth & User Service (RequestValidator) and the Firebase password policy.
-const PHONE = /^\+?\d{10,14}$/;
-const normalizePhone = (value: string) => value.replace(/[\s-]/g, "");
+import { normalizePkPhone, PK_PHONE_EXAMPLE, pkPhoneSchema } from "@/lib/phone";
 
 const schema = z
   .object({
@@ -33,10 +30,7 @@ const schema = z
       .min(1, "Please enter your email.")
       .max(150, "Use 150 characters or fewer.")
       .pipe(z.email("Please enter a valid email address.")),
-    phone: z
-      .string()
-      .min(1, "Please enter your phone number.")
-      .refine((v) => PHONE.test(normalizePhone(v)), "Enter 10 to 14 digits, for example 03001234567."),
+    phone: pkPhoneSchema,
     cnic: z.string().regex(/^\d{13}$/, "The CNIC must have exactly 13 digits."),
     registrationNo: z
       .string()
@@ -114,7 +108,7 @@ export function DoctorSignupForm() {
       await authApi.registerDoctor({
         fullName: values.fullName.trim(),
         email,
-        phone: normalizePhone(values.phone),
+        phone: normalizePkPhone(values.phone) ?? values.phone,
         cnic: values.cnic,
         registrationNo: values.registrationNo.trim(),
         password: values.password,
@@ -177,13 +171,13 @@ export function DoctorSignupForm() {
         </FormField>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <FormField id="phone" label="Phone number" error={errors.phone?.message} hint="For example 03001234567">
+          <FormField id="phone" label="Phone number" error={errors.phone?.message} hint={`For example ${PK_PHONE_EXAMPLE}`}>
             <Input
               id="phone"
               type="tel"
               inputMode="tel"
               autoComplete="tel"
-              placeholder="03001234567"
+              placeholder={PK_PHONE_EXAMPLE}
               aria-invalid={!!errors.phone}
               aria-describedby={describedBy("phone")}
               {...register("phone")}

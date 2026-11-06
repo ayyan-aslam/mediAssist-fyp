@@ -1,3 +1,8 @@
+// The API Gateway sends the client IP on every route, and the user ID on protected routes.
+function clientIp(req) {
+  return req.get('x-user-ip') ?? req.ip;
+}
+
 export class AuthController {
   constructor({ requestValidator, authService }) {
     this.requestValidator = requestValidator;
@@ -13,7 +18,7 @@ export class AuthController {
 
   login = async (req, res) => {
     const { firebaseToken } = this.requestValidator.validateLogin(req.body);
-    res.json(await this.authService.login(firebaseToken));
+    res.json(await this.authService.login(firebaseToken, clientIp(req)));
   };
 
   refresh = async (req, res) => {
@@ -23,7 +28,8 @@ export class AuthController {
 
   logout = async (req, res) => {
     const { refreshToken } = this.requestValidator.validateRefreshToken(req.body);
-    await this.authService.logout(refreshToken);
+    const userId = Number(req.get('x-user-id')) || null;
+    await this.authService.logout(refreshToken, { userId, ipAddress: clientIp(req) });
     res.status(204).end();
   };
 }
