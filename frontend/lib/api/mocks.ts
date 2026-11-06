@@ -14,6 +14,7 @@
 // - New consultation: phone 03214567890 is a saved patient (the doc example). Other numbers are new.
 //   Patients added or edited here are kept until the page is reloaded.
 // - Recording: every audio part is saved (201) and stop always succeeds.
+// - SOAP note: every consultation has the doc example note. Saved changes are kept until the page is reloaded.
 
 const DOCTOR = {
   userId: 16,
@@ -44,6 +45,17 @@ const ADMIN_USER = {
 const CLINICAL_PATIENTS: Record<string, unknown>[] = [
   { clinicalPatientId: 7, fullName: "Bilal Hussain", phone: "03214567890", email: null, age: 45, gender: "male", createdAt: "2026-10-07T09:00:00Z" },
 ];
+
+const SOAP_NOTE = {
+  soapNoteId: 39,
+  consultationId: 41,
+  subjective: "Patient has sore throat for 3 days...",
+  objective: "Temperature 100 F. Throat is red.",
+  assessment: "Viral throat infection.",
+  plan: "Panadol 500 mg twice a day for 3 days. Warm salt water gargles.",
+  updatedAt: "2026-10-07T09:19:12Z",
+};
+let soapNoteChanged = false;
 
 function base64Url(value: object) {
   return btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -137,6 +149,14 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "GET",
+    /^\/clinical-patients\/(\d+)$/,
+    (_, [id]) => {
+      const patient = CLINICAL_PATIENTS.find((p) => p.clinicalPatientId === Number(id));
+      return patient ? [200, patient] : error(404, "PATIENT_NOT_FOUND", "This patient was not found.");
+    },
+  ],
+  [
     "PATCH",
     /^\/clinical-patients\/(\d+)$/,
     (body, [id]) => {
@@ -171,6 +191,25 @@ const routes: [string, RegExp, Handler][] = [
     (_, [id]) => [200, { consultationId: Number(id), status: "processing", endedAt: new Date().toISOString() }],
   ],
   ["POST", /^\/consultations\/(\d+)\/retry$/, (_, [id]) => [200, { consultationId: Number(id), status: "processing" }]],
+  ["GET", /^\/consultations\/(\d+)\/soap-note$/, (_, [id]) => [200, { ...SOAP_NOTE, consultationId: Number(id) }]],
+  [
+    "PATCH",
+    /^\/consultations\/(\d+)\/soap-note$/,
+    (body) => {
+      Object.assign(SOAP_NOTE, body, { updatedAt: new Date().toISOString() });
+      soapNoteChanged = true;
+      return [200, { updatedAt: SOAP_NOTE.updatedAt }];
+    },
+  ],
+  [
+    "POST",
+    /^\/consultations\/(\d+)\/soap-note\/finish-editing$/,
+    () => {
+      const changed = soapNoteChanged;
+      soapNoteChanged = false;
+      return [200, { changed }];
+    },
+  ],
   ["GET", /^\/admin\/users$/, () => [200, { items: [ADMIN_USER], page: 1, pageSize: 20, total: 1 }]],
   ["GET", /^\/admin\/users\/(\d+)$/, () => [200, ADMIN_USER]],
   ["POST", /^\/admin\/users\/(\d+)\/suspend$/, (_, [id]) => [200, { userId: Number(id), accountStatus: "suspended" }]],
