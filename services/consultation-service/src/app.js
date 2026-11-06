@@ -5,9 +5,11 @@ import { PatientController } from './controllers/PatientController.js';
 import { SoapNoteController } from './controllers/SoapNoteController.js';
 import { createRouter } from './routes.js';
 import { ConsultationService } from './services/ConsultationService.js';
+import { PdfGenerator } from './services/PdfGenerator.js';
 import { PatientService } from './services/PatientService.js';
 import { SoapNoteEditService } from './services/SoapNoteEditService.js';
 import { SoapNoteHistoryService } from './services/SoapNoteHistoryService.js';
+import { SoapNotePdfService } from './services/SoapNotePdfService.js';
 import { RequestValidator } from './validators/RequestValidator.js';
 
 // Repositories, the S3Client, the EventPublisher, the SseManager and the EditSessionStore are passed in,
@@ -44,6 +46,7 @@ export function createApp({
     requestValidator,
     soapNoteEditService: new SoapNoteEditService({ soapNoteRepository, editSessionStore, eventPublisher, logger }),
     soapNoteHistoryService: new SoapNoteHistoryService({ soapNoteRepository, patientRepository }),
+    soapNotePdfService: new SoapNotePdfService({ soapNoteRepository, pdfGenerator: new PdfGenerator() }),
   });
 
   const app = express();

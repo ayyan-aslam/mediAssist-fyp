@@ -101,6 +101,18 @@ export class SoapNoteRepository {
     });
   }
 
+  // For the PDF: the consultation date, the patient and the note. Same null / { soapNote: null } rule as above.
+  findForPdf(consultationId, doctorId) {
+    return this.prisma.consultation.findFirst({
+      where: { consultationId, clinicalPatient: { doctorId } },
+      select: {
+        startedAt: true,
+        clinicalPatient: { select: { fullName: true, age: true, gender: true, phone: true } },
+        soapNote: { select: { subjective: true, objective: true, assessment: true, plan: true } },
+      },
+    });
+  }
+
   // Saves only the sent parts. Returns the new updated_at, or null when there is no note of this doctor.
   async update(consultationId, doctorId, changes) {
     const rows = await this.prisma.soapNote.updateManyAndReturn({

@@ -28,6 +28,8 @@ export interface ApiOptions {
   silent?: boolean;
   // true for requests that must finish after the page is closed (fetch keepalive).
   keepalive?: boolean;
+  // "blob" for file downloads (like a PDF). JSON otherwise.
+  responseType?: "json" | "blob";
 }
 
 const NETWORK_ERROR_MESSAGE = "Cannot reach the server. Check your internet connection and try again.";
@@ -128,6 +130,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
 
     if (!res.ok) throw await readError(res);
     if (res.status === 204) return undefined as T;
+    if (options.responseType === "blob") return (await res.blob()) as T;
     return (await res.json()) as T;
   } catch (err) {
     const error =

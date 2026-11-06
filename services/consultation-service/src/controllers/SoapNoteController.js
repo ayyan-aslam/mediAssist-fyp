@@ -1,12 +1,13 @@
 import { consultationNotFoundError, patientNotFoundError } from '../errors.js';
-import { clientIp, currentDoctorId } from './currentDoctor.js';
+import { clientIp, currentDoctorId, currentDoctorName } from './currentDoctor.js';
 
 // SOAP note endpoints: design doc Section 5.5 and Diagram 12.
 export class SoapNoteController {
-  constructor({ requestValidator, soapNoteEditService, soapNoteHistoryService }) {
+  constructor({ requestValidator, soapNoteEditService, soapNoteHistoryService, soapNotePdfService }) {
     this.requestValidator = requestValidator;
     this.soapNoteEditService = soapNoteEditService;
     this.soapNoteHistoryService = soapNoteHistoryService;
+    this.soapNotePdfService = soapNotePdfService;
   }
 
   // Opening the note starts the editing session.
@@ -28,6 +29,18 @@ export class SoapNoteController {
     const doctorId = currentDoctorId(req);
     const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);
     res.json(await this.soapNoteEditService.finishEditing(consultationId, doctorId));
+  };
+
+  // Made on download, never stored.
+  downloadPdf = async (req, res) => {
+    const doctorId = currentDoctorId(req);
+    const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);
+    const pdf = await this.soapNotePdfService.createPdf(consultationId, doctorId, currentDoctorName(req));
+    res
+      .type('application/pdf')
+      .set('Content-Disposition', `attachment; filename="soap-note-${consultationId}.pdf"`)
+      .set('Cache-Control', 'no-store')
+      .send(pdf);
   };
 
   listForPatient = async (req, res) => {

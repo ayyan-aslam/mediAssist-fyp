@@ -17,3 +17,12 @@ export function currentDoctorId(req) {
 export function clientIp(req) {
   return req.get('x-user-ip') ?? req.ip;
 }
+
+// The doctor's name from the access token. The API Gateway sends it URL-encoded.
+export function currentDoctorName(req) {
+  try {
+    return decodeURIComponent(req.get('x-user-name') ?? '');
+  } catch {
+    return '';
+  }
+}

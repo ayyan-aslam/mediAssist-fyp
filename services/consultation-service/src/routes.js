@@ -23,6 +23,7 @@ export function createRouter({ patientController, consultationController, soapNo
   router.get('/consultations/:consultationId/soap-note', soapNoteController.getSoapNote);
   router.patch('/consultations/:consultationId/soap-note', soapNoteController.updateSoapNote);
   router.post('/consultations/:consultationId/soap-note/finish-editing', soapNoteController.finishEditing);
+  router.get('/consultations/:consultationId/soap-note/pdf', soapNoteController.downloadPdf);
 
   router.get('/internal/consultations/:consultationId/patient-contact', consultationController.getPatientContact);
 

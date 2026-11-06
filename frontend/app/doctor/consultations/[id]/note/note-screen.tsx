@@ -93,8 +93,26 @@ export function NoteScreen() {
 }
 
 function NoteEditor({ consultation, note }: { consultation: Consultation; note: SoapNote }) {
-  const { values, setPart, saveState, finishEditing } = useSoapNoteEditor(note);
+  const { values, setPart, saveState, saveNow, finishEditing } = useSoapNoteEditor(note);
   const [finishing, setFinishing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  // Saves the last changes first, so the PDF has what is on the screen.
+  const downloadPdf = async () => {
+    setDownloading(true);
+    try {
+      if (!(await saveNow())) {
+        toast.error("The note could not be saved, so the PDF was not made. Check your internet connection and try again.");
+        return;
+      }
+      const pdf = await consultationsApi.downloadSoapNotePdf(consultation.consultationId);
+      saveFile(pdf, pdfFileName(consultation));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "The PDF could not be downloaded. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const save = async () => {
     setFinishing(true);
@@ -121,11 +139,13 @@ function NoteEditor({ consultation, note }: { consultation: Consultation; note: 
           </h1>
           <p className="text-muted-foreground">{formatDateTime(consultation.startedAt)}</p>
         </div>
-        {/* Enabled when the PDF endpoint is built (B10). */}
-        <Button variant="outline" disabled className="self-start sm:self-auto">
-          <FileDown aria-hidden="true" data-icon="inline-start" />
-          Download PDF
-          <span className="rounded-full bg-peach px-2 py-0.5 text-[11px] font-semibold text-peach-foreground">Soon</span>
+        <Button variant="outline" onClick={downloadPdf} disabled={downloading} className="self-start sm:self-auto">
+          {downloading ? (
+            <Spinner className="size-4 text-current" label="Downloading" />
+          ) : (
+            <FileDown aria-hidden="true" data-icon="inline-start" />
+          )}
+          {downloading ? "Preparing PDF…" : "Download PDF"}
         </Button>
       </div>
 
@@ -332,6 +352,24 @@ function formatDateTime(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// Like "SOAP note - Bilal Hussain - 2026-10-07.pdf". Characters that file names cannot hold are removed.
+function pdfFileName(consultation: Consultation) {
+  const name = consultation.patient.fullName.replace(/[\\/:*?"<>|]+/g, "").trim();
+  return `SOAP note - ${name} - ${consultation.startedAt.slice(0, 10)}.pdf`;
+}
+
+function saveFile(file: Blob, fileName: string) {
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Some browsers start the download after click() returns, so the link is freed a little later.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function formatTime(iso: string) {
