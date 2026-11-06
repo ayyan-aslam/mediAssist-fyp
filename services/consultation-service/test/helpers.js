@@ -97,7 +97,42 @@ function createFakeRepositories() {
       return audioParts.filter((p) => p.consultationId === consultationId && p.partNo >= first && p.partNo <= last)
         .length;
     },
+    async findSavedPartNos(consultationId) {
+      return audioParts
+        .filter((p) => p.consultationId === consultationId)
+        .map((p) => p.partNo)
+        .sort((a, b) => a - b);
+    },
+    async countParts(consultationId) {
+      return audioParts.filter((p) => p.consultationId === consultationId).length;
+    },
+    // Updates WHERE status = from, like updateMany. Returns true when a row changed.
+    async markProcessing(id, endedAt) {
+      return changeIf(id, 'recording', { status: 'processing', endedAt });
+    },
+    async backToRecording(id) {
+      changeIf(id, 'processing', { status: 'recording', endedAt: null });
+    },
+    async startRetry(id) {
+      const row = consultations.find((c) => c.consultationId === id);
+      return changeIf(id, 'failed', {
+        soapAttempt: (row?.soapAttempt ?? 0) + 1,
+        status: 'processing',
+        failureReason: null,
+        aiRequestedAt: null,
+      });
+    },
+    async backToFailed(id, failureReason) {
+      changeIf(id, 'processing', { status: 'failed', failureReason });
+    },
   };
+
+  function changeIf(id, status, changes) {
+    const row = consultations.find((c) => c.consultationId === id && c.status === status);
+    if (!row) return false;
+    Object.assign(row, changes);
+    return true;
+  }
 
   // Like INSERT ... ON CONFLICT DO NOTHING: true only for the call that created the row.
   const transcriptRepository = {

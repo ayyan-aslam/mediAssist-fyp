@@ -20,6 +20,11 @@ export class TranscriptRepository {
     });
   }
 
+  // All windows of the consultation, in window_no order.
+  findWindows(consultationId) {
+    return this.prisma.transcriptWindow.findMany({ where: { consultationId }, orderBy: { windowNo: 'asc' } });
+  }
+
   saveText(consultationId, windowNo, transcriptText) {
     return this.prisma.transcriptWindow.updateMany({
       where: { consultationId, windowNo },

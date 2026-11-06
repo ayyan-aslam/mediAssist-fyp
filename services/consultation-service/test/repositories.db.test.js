@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPrismaClient } from '../src/db/prisma.js';
 import { ConsultationRepository } from '../src/repositories/ConsultationRepository.js';
 import { PatientRepository } from '../src/repositories/PatientRepository.js';
+import { SoapNoteRepository } from '../src/repositories/SoapNoteRepository.js';
 import { TranscriptRepository } from '../src/repositories/TranscriptRepository.js';
 
 try {
@@ -26,13 +27,23 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
   let patients;
   let consultations;
   let transcripts;
+  let soapNotes;
 
   beforeAll(() => {
     prisma = createPrismaClient(databaseUrl);
     patients = new PatientRepository(prisma);
     consultations = new ConsultationRepository(prisma);
     transcripts = new TranscriptRepository(prisma);
+    soapNotes = new SoapNoteRepository(prisma);
   });
+
+  let nextPhone = 100;
+  async function newConsultation(status = 'processing') {
+    nextPhone += 1;
+    const patient = await patients.insert(doctorId, newPatient(`030000${String(nextPhone).padStart(5, '0')}`));
+    return consultations.create({ clinicalPatientId: patient.clinicalPatientId, status, startedAt: new Date() });
+  }
+  const read = (consultationId) => prisma.consultation.findUnique({ where: { consultationId } });
 
   afterAll(async () => {
     const mine = { clinicalPatient: { doctorId: { in: [doctorId, otherDoctorId] } } };
@@ -219,5 +230,121 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
     expect(await prisma.audioPart.count({ where: { consultationId } })).toBe(0);
     expect(await prisma.transcriptWindow.count({ where: { consultationId } })).toBe(0);
     expect(await prisma.soapNote.count({ where: { consultationId } })).toBe(0);
+  });
+
+  it('stops a recording once and lists the saved part numbers', async () => {
+    const { consultationId } = await newConsultation('recording');
+    for (const partNo of [3, 1, 2]) {
+      await consultations.savePart({ consultationId, partNo, fileKey: `test/${consultationId}/${partNo}.webm`, durationSec: 10 });
+    }
+    const endedAt = new Date();
+
+    expect(await consultations.findSavedPartNos(consultationId)).toEqual([1, 2, 3]);
+    expect(await consultations.countParts(consultationId)).toBe(3);
+    const both = await Promise.all([
+      consultations.markProcessing(consultationId, endedAt),
+      consultations.markProcessing(consultationId, endedAt),
+    ]);
+    expect(both.sort()).toEqual([false, true]);
+    expect(await read(consultationId)).toMatchObject({ status: 'processing', endedAt });
+  });
+
+  it('starts a retry only from failed: next attempt, failure reason and ai_requested_at cleared', async () => {
+    const { consultationId } = await newConsultation('processing');
+    expect(await consultations.startRetry(consultationId)).toBe(false);
+    await prisma.consultation.update({
+      where: { consultationId },
+      data: { status: 'failed', failureReason: 'AI_TIMEOUT', aiRequestedAt: new Date() },
+    });
+
+    expect(await consultations.startRetry(consultationId)).toBe(true);
+    expect(await read(consultationId)).toMatchObject({
+      status: 'processing',
+      soapAttempt: 2,
+      failureReason: null,
+      aiRequestedAt: null,
+    });
+  });
+
+  it('reads the consultation details for the AI Pipeline messages', async () => {
+    const { consultationId, clinicalPatientId } = await newConsultation('processing');
+    for (const [partNo, durationSec] of [[1, 10], [2, 10], [3, 4], [4, 10]]) {
+      await consultations.savePart({ consultationId, partNo, fileKey: `test/${consultationId}/${partNo}.webm`, durationSec });
+    }
+
+    expect(await soapNotes.findConsultation(consultationId)).toEqual({
+      consultationId,
+      status: 'processing',
+      soapAttempt: 1,
+      hasNote: false,
+      doctorId,
+      clinicalPatientId,
+      patientAge: 45,
+      patientGender: 'male',
+    });
+    expect(await soapNotes.getDurationSec(consultationId, 3)).toBe(24);
+    expect(await soapNotes.findConsultation(2_000_000_000)).toBeNull();
+  });
+
+  it('saves the SOAP note and sets completed in one transaction, only for the current attempt and once', async () => {
+    const { consultationId } = await newConsultation('processing');
+    await prisma.consultation.update({ where: { consultationId }, data: { soapAttempt: 2 } });
+    const aiResult = { schema_version: '1.0', soap: { objective: null }, warnings: ['کھانے کے بعد'] };
+    const note = { subjective: 'Gala kharab', objective: '', assessment: 'Viral', plan: 'Panadol 500 mg', aiResult };
+
+    expect(await soapNotes.saveSoapNote(consultationId, 1, note)).toBeNull();
+    expect((await read(consultationId)).status).toBe('processing');
+
+    const results = await Promise.all([
+      soapNotes.saveSoapNote(consultationId, 2, note),
+      soapNotes.saveSoapNote(consultationId, 2, { ...note, plan: 'Other' }),
+    ]);
+
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect((await read(consultationId)).status).toBe('completed');
+    const saved = await prisma.soapNote.findUnique({ where: { consultationId } });
+    expect(saved.aiResult).toEqual(aiResult);
+    expect((await soapNotes.findConsultation(consultationId)).hasNote).toBe(true);
+  });
+
+  it('marks failed only while processing, and only for the given attempt', async () => {
+    const { consultationId } = await newConsultation('processing');
+
+    expect(await soapNotes.markFailed(consultationId, 'AI_FAILED', 2)).toBeNull();
+    expect(await soapNotes.markFailed(consultationId, 'AI_FAILED', 1)).toEqual({ consultationId, doctorId });
+    expect(await read(consultationId)).toMatchObject({ status: 'failed', failureReason: 'AI_FAILED' });
+    expect(await soapNotes.markFailed(consultationId, 'TRANSCRIPTION_FAILED')).toBeNull();
+  });
+
+  it('sets ai_requested_at only for the current attempt while processing', async () => {
+    const { consultationId } = await newConsultation('processing');
+    const at = new Date();
+
+    expect(await soapNotes.setAiRequestedAt(consultationId, 2, at)).toBe(false);
+    expect(await soapNotes.setAiRequestedAt(consultationId, 1, at)).toBe(true);
+    expect((await read(consultationId)).aiRequestedAt).toEqual(at);
+  });
+
+  it('times out only the consultations that waited too long, in one UPDATE ... RETURNING', async () => {
+    const old = await newConsultation('processing');
+    const recent = await newConsultation('processing');
+    const notSent = await newConsultation('processing');
+    await soapNotes.setAiRequestedAt(old.consultationId, 1, new Date(Date.now() - 120_000));
+    await soapNotes.setAiRequestedAt(recent.consultationId, 1, new Date());
+
+    const rows = await soapNotes.markTimedOut(new Date(Date.now() - 60_000));
+
+    expect(rows.filter((row) => row.doctorId === doctorId)).toEqual([{ consultationId: old.consultationId, doctorId }]);
+    expect(await read(old.consultationId)).toMatchObject({ status: 'failed', failureReason: 'AI_TIMEOUT' });
+    expect((await read(recent.consultationId)).status).toBe('processing');
+    expect((await read(notSent.consultationId)).status).toBe('processing');
+  });
+
+  it('finds all transcript windows in order', async () => {
+    const { consultationId } = await newConsultation('processing');
+    await transcripts.createPendingWindow(consultationId, 2);
+    await transcripts.createPendingWindow(consultationId, 1);
+
+    expect((await transcripts.findWindows(consultationId)).map((w) => w.windowNo)).toEqual([1, 2]);
   });
 });

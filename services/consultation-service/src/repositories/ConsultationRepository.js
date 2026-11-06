@@ -47,6 +47,55 @@ export class ConsultationRepository {
     });
   }
 
+  // The numbers of all saved parts, in order.
+  async findSavedPartNos(consultationId) {
+    const parts = await this.prisma.audioPart.findMany({
+      where: { consultationId },
+      select: { partNo: true },
+      orderBy: { partNo: 'asc' },
+    });
+    return parts.map((part) => part.partNo);
+  }
+
+  countParts(consultationId) {
+    return this.prisma.audioPart.count({ where: { consultationId } });
+  }
+
+  // Stop: recording -> processing. Returns false when it was not recording any more (stopped twice at once).
+  async markProcessing(consultationId, endedAt) {
+    const { count } = await this.prisma.consultation.updateMany({
+      where: { consultationId, status: 'recording' },
+      data: { status: 'processing', endedAt },
+    });
+    return count === 1;
+  }
+
+  // Undoes markProcessing when consultation.recorded could not be sent, so the app can call stop again.
+  backToRecording(consultationId) {
+    return this.prisma.consultation.updateMany({
+      where: { consultationId, status: 'processing' },
+      data: { status: 'recording', endedAt: null },
+    });
+  }
+
+  // Try again: one update from failed to processing with the next attempt.
+  // Returns false when the consultation is not failed.
+  async startRetry(consultationId) {
+    const { count } = await this.prisma.consultation.updateMany({
+      where: { consultationId, status: 'failed' },
+      data: { soapAttempt: { increment: 1 }, status: 'processing', failureReason: null, aiRequestedAt: null },
+    });
+    return count === 1;
+  }
+
+  // Undoes startRetry when consultation.recorded could not be sent. The attempt stays higher, which is safe.
+  backToFailed(consultationId, failureReason) {
+    return this.prisma.consultation.updateMany({
+      where: { consultationId, status: 'processing' },
+      data: { status: 'failed', failureReason },
+    });
+  }
+
   // Internal use only (Prescription Service): no doctor check.
   findPatientContact(consultationId) {
     return this.prisma.consultation.findUnique({

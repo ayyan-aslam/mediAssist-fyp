@@ -34,6 +34,19 @@ export class ConsultationController {
     res.status(created ? 201 : 200).json({ partNo, saved: true });
   };
 
+  stop = async (req, res) => {
+    const doctorId = currentDoctorId(req);
+    const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);
+    const { totalParts } = this.requestValidator.validateStop(req.body);
+    res.json(await this.consultationService.stop(doctorId, consultationId, totalParts));
+  };
+
+  retry = async (req, res) => {
+    const doctorId = currentDoctorId(req);
+    const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);
+    res.json(await this.consultationService.retry(doctorId, consultationId));
+  };
+
   // Internal (Prescription Service). The gateway does not expose /internal routes, so there is no user.
   getPatientContact = async (req, res) => {
     const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);

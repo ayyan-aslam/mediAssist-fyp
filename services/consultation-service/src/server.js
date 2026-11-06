@@ -7,9 +7,14 @@ import { createPrismaClient } from './db/prisma.js';
 import { logger } from './logger.js';
 import { ConsultationRepository } from './repositories/ConsultationRepository.js';
 import { PatientRepository } from './repositories/PatientRepository.js';
+import { SoapNoteRepository } from './repositories/SoapNoteRepository.js';
 import { TranscriptRepository } from './repositories/TranscriptRepository.js';
 import { AudioMerger } from './services/AudioMerger.js';
+import { SoapNoteService } from './services/SoapNoteService.js';
 import { TranscriptionService } from './services/TranscriptionService.js';
+
+// The AI answer check runs this often (design doc 3.8).
+const AI_ANSWER_CHECK_MS = 15_000;
 
 // The config is checked on import (./config.js). Then RabbitMQ, then the HTTP server.
 const prisma = createPrismaClient(config.CONSULTATION_DATABASE_URL);
@@ -25,6 +30,7 @@ const topologyReady = new Promise((resolve) => {
   });
 });
 
+const eventPublisher = new EventPublisher({ connection: rabbit, source: 'consultation-service', logger });
 const consultationRepository = new ConsultationRepository(prisma);
 const transcriptRepository = new TranscriptRepository(prisma);
 const s3Client = new S3Client({
@@ -52,12 +58,33 @@ const transcriptionService = new TranscriptionService({
   overlapParts: config.TRANSCRIPTION_OVERLAP_PARTS,
   logger,
 });
+// Stop, AI Pipeline answers and the AI answer check (design doc Diagram 6 Parts 2 and 3).
+const soapNoteService = new SoapNoteService({
+  soapNoteRepository: new SoapNoteRepository(prisma),
+  transcriptRepository,
+  transcriptionService,
+  eventPublisher,
+  aiAnswerTimeoutSec: config.AI_ANSWER_TIMEOUT_SEC,
+  logger,
+});
+
 const eventConsumer = new EventConsumer({ connection: rabbit, logger });
 eventConsumer.consume(
   'consultation.audio.window.ready',
   ({ data }) => transcriptionService.transcribeWindow(data.consultationId, data.windowNo),
   { prefetch: 5 },
 );
+eventConsumer.consume(
+  'consultation.consultation.recorded',
+  ({ data }) => soapNoteService.finishTranscript(data.consultationId, data.totalParts),
+  { prefetch: 5 },
+);
+eventConsumer.consume('consultation.soap.generated', ({ data }) => soapNoteService.saveGenerated(data), {
+  prefetch: 5,
+});
+eventConsumer.consume('consultation.soap.generation.failed', ({ data }) => soapNoteService.markAiFailed(data), {
+  prefetch: 5,
+});
 
 await rabbit.start();
 logger.info('Waiting for RabbitMQ to create the exchange and queues');
@@ -69,8 +96,12 @@ const app = createApp({
   consultationRepository,
   transcriptRepository,
   s3Client,
-  eventPublisher: new EventPublisher({ connection: rabbit, source: 'consultation-service', logger }),
+  eventPublisher,
 });
+
+const aiAnswerCheck = setInterval(() => {
+  soapNoteService.failTimedOut().catch((err) => logger.error({ err }, 'AI answer check failed'));
+}, AI_ANSWER_CHECK_MS);
 
 const server = app.listen(config.CONSULTATION_SERVICE_PORT, (err) => {
   if (err) {
@@ -81,6 +112,7 @@ const server = app.listen(config.CONSULTATION_SERVICE_PORT, (err) => {
 });
 
 function shutdown() {
+  clearInterval(aiAnswerCheck);
   server.close(async () => {
     await rabbit.close();
     await prisma.$disconnect();

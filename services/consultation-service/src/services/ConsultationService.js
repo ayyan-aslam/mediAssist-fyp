@@ -1,6 +1,8 @@
 import {
   consultationNotFoundError,
+  notFailedError,
   notRecordingError,
+  partsMissingError,
   patientNotFoundError,
   recordingTooLongError,
 } from '../errors.js';
@@ -97,6 +99,58 @@ export class ConsultationService {
       this.logger.error({ err, consultationId, windowNo }, 'Could not send audio.window.ready');
       await this.transcriptRepository.deleteWindow(consultationId, windowNo);
     }
+  }
+
+  // Stops the recording (Diagram 5, Part 4): checks that parts 1 to totalParts are all saved, sets the status
+  // to processing and sends consultation.recorded (6.4.2), which finishes the transcript.
+  async stop(doctorId, consultationId, totalParts) {
+    const consultation = await this.consultationRepository.findByDoctorAndId(doctorId, consultationId);
+    if (!consultation) throw consultationNotFoundError();
+    if (consultation.status !== 'recording') throw notRecordingError();
+
+    const saved = new Set(await this.consultationRepository.findSavedPartNos(consultationId));
+    const missingParts = [];
+    for (let partNo = 1; partNo <= totalParts; partNo += 1) {
+      if (!saved.has(partNo)) missingParts.push(partNo);
+    }
+    if (missingParts.length > 0) throw partsMissingError(missingParts);
+
+    const endedAt = new Date();
+    if (!(await this.consultationRepository.markProcessing(consultationId, endedAt))) throw notRecordingError();
+    try {
+      await this.#sendRecorded(consultationId, totalParts, endedAt);
+    } catch (err) {
+      // Without the message nothing would finish the transcript. Undo, so the app can call stop again.
+      await this.consultationRepository.backToRecording(consultationId);
+      throw err;
+    }
+    return { consultationId, status: 'processing', endedAt: toIso(endedAt) };
+  }
+
+  // Try again after a failure: the next attempt, then consultation.recorded again. Nothing is recorded again;
+  // only the minutes that are not done are transcribed, and the transcript is sent with the new attempt.
+  async retry(doctorId, consultationId) {
+    const consultation = await this.consultationRepository.findByDoctorAndId(doctorId, consultationId);
+    if (!consultation) throw consultationNotFoundError();
+    if (!(await this.consultationRepository.startRetry(consultationId))) throw notFailedError();
+
+    try {
+      const totalParts = await this.consultationRepository.countParts(consultationId);
+      await this.#sendRecorded(consultationId, totalParts, consultation.endedAt);
+    } catch (err) {
+      await this.consultationRepository.backToFailed(consultationId, consultation.failureReason);
+      throw err;
+    }
+    return { consultationId, status: 'processing' };
+  }
+
+  #sendRecorded(consultationId, totalParts, endedAt) {
+    return this.eventPublisher.publish('consultation.recorded', {
+      consultationId,
+      totalParts,
+      lastFullWindowNo: Math.floor(totalParts / PARTS_PER_WINDOW),
+      endedAt: toIso(endedAt),
+    });
   }
 
   // For the Prescription Service (GET /internal/consultations/{id}/patient-contact).
