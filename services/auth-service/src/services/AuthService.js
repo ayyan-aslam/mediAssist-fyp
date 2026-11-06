@@ -1,4 +1,5 @@
 import { AppError } from '@mediassist/common';
+import { takenField } from '../repositories/UserRepository.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from './TokenService.js';
 
 // Field name from UserRepository.findDuplicates -> 409 error (design doc Section 5.2).
@@ -55,11 +56,18 @@ export class AuthService {
     try {
       return await this.userRepository.createUserWithProfile({ firebaseUid, fullName, email, phone, role, profile });
     } catch (err) {
-      this.logger.error({ err }, 'Saving the new user failed. Deleting the Firebase user.');
+      // Another sign-up saved the same value at the same moment, after the check above.
+      const field = takenField(err);
+      if (field) this.logger.info({ field }, 'The value was registered at the same moment. Deleting the Firebase user.');
+      else this.logger.error({ err }, 'Saving the new user failed. Deleting the Firebase user.');
       // No half-made account is left: remove the Firebase user too.
       await this.firebaseClient.deleteUser(firebaseUid).catch((deleteErr) => {
         this.logger.error({ err: deleteErr, firebaseUid }, 'Deleting the Firebase user failed');
       });
+      if (field) {
+        const [code, message] = CONFLICT_ERRORS[field];
+        throw new AppError(409, code, message);
+      }
       throw new AppError(500, 'SIGNUP_FAILED', 'Your account could not be created. Please try again.');
     }
   }

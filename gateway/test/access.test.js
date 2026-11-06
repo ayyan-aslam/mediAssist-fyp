@@ -64,8 +64,7 @@ describe('role check', () => {
 
     it(`forwards ${route.method} ${route.path} for a doctor to the Consultation Service`, async () => {
       const app = buildApp(services);
-      const res = await request(app)
-        [route.method.toLowerCase()](`/api/v1${path}`)
+      const res = await request(app)[route.method.toLowerCase()](`/api/v1${path}`)
         .set('Authorization', await bearer(doctor));
       expect(res.status).toBe(200);
       expect(res.body.service).toBe('consultation');
@@ -76,8 +75,7 @@ describe('role check', () => {
 
     it(`blocks ${route.method} ${route.path} for a patient`, async () => {
       const app = buildApp(services);
-      const res = await request(app)
-        [route.method.toLowerCase()](`/api/v1${path}`)
+      const res = await request(app)[route.method.toLowerCase()](`/api/v1${path}`)
         .set('Authorization', await bearer(patient));
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('FORBIDDEN');

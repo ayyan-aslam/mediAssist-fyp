@@ -18,10 +18,14 @@
   ],
   "scripts": {
     "dev": "concurrently --names gateway,auth,consultation --prefix-colors cyan,magenta,green \"npm run dev -w gateway\" \"npm run dev -w services/auth-service\" \"npm run dev -w services/consultation-service\"",
-    "test": "npm test --workspaces --if-present"
+    "test": "npm test --workspaces --if-present",
+    "lint": "eslint ."
   },
   "devDependencies": {
-    "concurrently": "^10.0.6"
+    "@eslint/js": "^9.39.5",
+    "concurrently": "^10.0.6",
+    "eslint": "^9.39.5",
+    "globals": "^17.14.0"
   },
   "allowScripts": {
     "prisma@7.10.0": true,

@@ -4,6 +4,21 @@ const PROFILE_RELATION = {
   doctor: 'doctorProfile',
 };
 
+// The unique indexes of UserDB and the request field each one protects.
+const UNIQUE_FIELDS = {
+  users_email_key: 'email',
+  users_phone_key: 'phone',
+  doctor_profile_cnic_hash_key: 'cnic',
+  doctor_profile_registration_no_key: 'registrationNo',
+};
+
+// The field that a unique index refused (Prisma error P2002), or null for any other error.
+// findDuplicates() checks first, but two requests at the same moment can both pass that check.
+export function takenField(err) {
+  if (err?.code !== 'P2002') return null;
+  return UNIQUE_FIELDS[err.meta?.driverAdapterError?.cause?.constraint?.index] ?? null;
+}
+
 export class UserRepository {
   constructor(prisma) {
     this.prisma = prisma;

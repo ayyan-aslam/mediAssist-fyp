@@ -19,6 +19,14 @@ export const validDoctor = {
   confirmPassword: 'Secret@123',
 };
 
+// The Prisma error for a value that a unique index refused (shape from @prisma/adapter-pg).
+export function uniqueViolation(index) {
+  return Object.assign(new Error('Unique constraint failed'), {
+    code: 'P2002',
+    meta: { driverAdapterError: { cause: { kind: 'UniqueConstraintViolation', constraint: { index } } } },
+  });
+}
+
 // In-memory copies of the repositories, so the tests do not need a database.
 function createFakeRepositories() {
   const users = [];

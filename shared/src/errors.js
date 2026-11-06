@@ -31,6 +31,10 @@ export function errorHandler(logger) {
     if (err.type === 'entity.parse.failed') {
       return sendError(res, 400, 'VALIDATION_ERROR', 'The request body is not valid JSON.');
     }
+    // A JSON body over the limit of express.json().
+    if (err.type === 'entity.too.large') {
+      return sendError(res, 400, 'VALIDATION_ERROR', 'The request body is too large.');
+    }
 
     logger.error({ err, method: req.method, url: req.originalUrl }, 'Unhandled error');
     return sendError(res, 500, 'INTERNAL_ERROR', 'Something went wrong. Please try again.');

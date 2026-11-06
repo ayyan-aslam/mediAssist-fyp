@@ -63,7 +63,7 @@ function cutRepeated(text, repeated) {
     const rest = body.slice(cut);
     if (/^[\p{L}\p{N}]/u.test(rest)) return null;
     // Drops the spaces and punctuation left at the start, but keeps a leading [unclear].
-    const remaining = rest.replace(/^[^\p{L}\p{N}\[]+/u, '');
+    const remaining = rest.replace(/^[^\p{L}\p{N}[]+/u, '');
     const result = [...(remaining ? [label + remaining] : []), ...lines.slice(i + 1)].join('\n');
     return result.trim() ? result : null;
   }

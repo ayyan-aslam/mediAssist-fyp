@@ -50,6 +50,14 @@ describe('errorHandler', () => {
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
+
+  it('returns 400 VALIDATION_ERROR for a JSON body over the size limit', async () => {
+    const res = await request(createTestApp())
+      .post('/items')
+      .send({ name: 'x'.repeat(200 * 1024) });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: { code: 'VALIDATION_ERROR', message: 'The request body is too large.' } });
+  });
 });
 
 describe('validate', () => {

@@ -104,12 +104,13 @@ async function main() {
   const api = createApi(gatewayUrl, accessToken);
   const dir = await mkdtemp(path.join(tmpdir(), 'mediassist-parts-'));
 
+  // Errors are thrown, not fail(), inside this try, so the parts folder is always removed.
   try {
     const parts = await cutIntoParts(audioFile, dir);
     console.log(`Cut ${path.basename(audioFile)} into ${parts.length} parts of up to ${PART_SECONDS} seconds.`);
 
     const started = await api('POST', '/consultations', { clinicalPatientId });
-    if (started.status !== 201) fail(`start failed (${started.status}): ${JSON.stringify(started.body)}`);
+    if (started.status !== 201) throw new Error(`start failed (${started.status}): ${JSON.stringify(started.body)}`);
     const { consultationId } = started.body;
     console.log(`Started consultation ${consultationId}.`);
 
@@ -119,7 +120,7 @@ async function main() {
       const sentAt = Date.now();
       const res = await uploadPart(api, consultationId, part);
       console.log(`Part ${part.partNo}/${parts.length} (${part.durationSec}s): ${res.status} ${JSON.stringify(res.body)}`);
-      if (res.status >= 400 && res.status < 500) fail('the upload was refused.');
+      if (res.status >= 400 && res.status < 500) throw new Error('the upload was refused.');
       if (part.partNo < parts.length) await sleep(Math.max(0, intervalMs - (Date.now() - sentAt)));
     }
 
