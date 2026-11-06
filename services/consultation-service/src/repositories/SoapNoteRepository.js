@@ -1,3 +1,5 @@
+import { Prisma } from '../../generated/prisma/client.ts';
+
 // Thrown inside the transaction to roll it back when the consultation moved on (another attempt, or done).
 class StaleAnswer extends Error {}
 
@@ -84,6 +86,66 @@ export class SoapNoteRepository {
       if (err instanceof StaleAnswer || isUniqueViolation(err)) return null;
       throw err;
     }
+  }
+
+  // SOAP note editing (design doc Diagram 12). Every query below includes doctorId, so a doctor never
+  // reads or changes the notes of another doctor's patients.
+
+  // null when the consultation does not exist or belongs to another doctor; otherwise { soapNote } with
+  // soapNote null until the note is ready.
+  findSoapNote(consultationId, doctorId) {
+    return this.prisma.consultation.findFirst({
+      where: { consultationId, clinicalPatient: { doctorId } },
+      select: { soapNote: { omit: { aiResult: true } } },
+    });
+  }
+
+  // Saves only the sent parts. Returns the new updated_at, or null when there is no note of this doctor.
+  async update(consultationId, doctorId, changes) {
+    const rows = await this.prisma.soapNote.updateManyAndReturn({
+      where: { consultationId, consultation: { clinicalPatient: { doctorId } } },
+      data: { ...changes, updatedAt: new Date() },
+      select: { updatedAt: true },
+    });
+    return rows[0]?.updatedAt ?? null;
+  }
+
+  // A patient's consultations with the assessment of their note, newest first (index on
+  // clinical_patient_id, started_at). The note is null when the consultation has none yet.
+  async findByPatient(doctorId, clinicalPatientId, { page, pageSize }) {
+    const where = { clinicalPatientId, clinicalPatient: { doctorId } };
+    const [rows, total] = await Promise.all([
+      this.prisma.consultation.findMany({
+        where,
+        orderBy: [{ startedAt: 'desc' }, { consultationId: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: { consultationId: true, startedAt: true, status: true, soapNote: { select: { assessment: true } } },
+      }),
+      this.prisma.consultation.count({ where }),
+    ]);
+    return { rows, total };
+  }
+
+  // SOAP notes whose patient name or phone contains q (ILIKE '%q%', served by the trigram indexes),
+  // only of this doctor's patients, newest first. % and _ in q are matched as plain characters.
+  async search(doctorId, q, { page, pageSize }) {
+    const pattern = `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+    const match = Prisma.sql`
+      FROM soap_note s
+      JOIN consultation c ON c.consultation_id = s.consultation_id
+      JOIN clinical_patient p ON p.clinical_patient_id = c.clinical_patient_id
+      WHERE p.doctor_id = ${doctorId} AND (p.full_name ILIKE ${pattern} OR p.phone ILIKE ${pattern})`;
+    const [rows, [{ total }]] = await Promise.all([
+      this.prisma.$queryRaw`
+        SELECT c.consultation_id AS "consultationId", c.started_at AS "startedAt",
+               p.clinical_patient_id AS "clinicalPatientId", p.full_name AS "fullName", p.phone
+        ${match}
+        ORDER BY c.started_at DESC, c.consultation_id DESC
+        LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
+      this.prisma.$queryRaw`SELECT COUNT(*)::int AS total ${match}`,
+    ]);
+    return { rows, total };
   }
 
   // AI answer check: one UPDATE ... RETURNING for every consultation that waited too long.

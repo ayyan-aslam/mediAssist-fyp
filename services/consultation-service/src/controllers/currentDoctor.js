@@ -12,3 +12,8 @@ export function currentDoctorId(req) {
   }
   return userId;
 }
+
+// The API Gateway sends the client IP on every route (used for the audit log).
+export function clientIp(req) {
+  return req.get('x-user-ip') ?? req.ip;
+}

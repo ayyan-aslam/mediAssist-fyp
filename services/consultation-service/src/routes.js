@@ -2,13 +2,15 @@ import { Router } from 'express';
 import { audioUpload } from './middleware/audioUpload.js';
 
 // Endpoints: design doc Section 5.5.
-export function createRouter({ patientController, consultationController }) {
+export function createRouter({ patientController, consultationController, soapNoteController }) {
   const router = Router();
 
   router.post('/clinical-patients', patientController.create);
   router.get('/clinical-patients', patientController.findByPhone);
   router.get('/clinical-patients/:patientId', patientController.getById);
   router.patch('/clinical-patients/:patientId', patientController.update);
+  router.get('/clinical-patients/:patientId/soap-notes', soapNoteController.listForPatient);
+  router.get('/soap-notes/search', soapNoteController.search);
 
   router.post('/consultations', consultationController.start);
   // Before /consultations/:consultationId, so "events" is not read as an ID.
@@ -17,6 +19,9 @@ export function createRouter({ patientController, consultationController }) {
   router.post('/consultations/:consultationId/stop', consultationController.stop);
   router.post('/consultations/:consultationId/retry', consultationController.retry);
   router.get('/consultations/:consultationId', consultationController.getById);
+  router.get('/consultations/:consultationId/soap-note', soapNoteController.getSoapNote);
+  router.patch('/consultations/:consultationId/soap-note', soapNoteController.updateSoapNote);
+  router.post('/consultations/:consultationId/soap-note/finish-editing', soapNoteController.finishEditing);
 
   router.get('/internal/consultations/:consultationId/patient-contact', consultationController.getPatientContact);
 
