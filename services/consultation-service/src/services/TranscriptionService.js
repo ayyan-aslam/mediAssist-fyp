@@ -21,6 +21,8 @@ export function hasLabels(text) {
 // so a new "Salam" from the patient is not taken for the doctor's "Salam".
 const MIN_REPEAT_LENGTH = 12;
 const LINES_TO_CHECK = 3;
+// When the recording stops, at most this many minutes are transcribed at the same time.
+const MAX_PARALLEL = 3;
 
 // Safety net after the clean-up: if the text still starts with the last line of the previous minute
 // (compared without labels, spaces and punctuation), that part is removed. The clean-up sometimes keeps
@@ -81,6 +83,7 @@ export class TranscriptionService {
     overlapParts,
     logger,
     previousWaitMs = 20_000,
+    busyWindowMs = 20_000,
     pollMs = 1000,
   }) {
     this.transcriptRepository = transcriptRepository;
@@ -92,7 +95,55 @@ export class TranscriptionService {
     this.overlapParts = overlapParts;
     this.logger = logger;
     this.previousWaitMs = previousWaitMs;
+    this.busyWindowMs = busyWindowMs;
     this.pollMs = pollMs;
+  }
+
+  // When the recording stops or the doctor tries again (Diagram 6 Part 2). Creates the rows of the minutes
+  // that have none (the last, shorter minute, or a minute whose message could not be sent), then makes every
+  // minute done: a failed or new minute is transcribed, and so is one that has been pending for more than
+  // 20 seconds. A younger pending minute is still being transcribed by its audio.window.ready message, so
+  // it is waited for. Returns the minutes that still failed.
+  async transcribeMissing(consultationId, totalParts) {
+    const windowCount = Math.ceil(totalParts / PARTS_PER_WINDOW);
+    const created = new Set();
+    for (let windowNo = 1; windowNo <= windowCount; windowNo += 1) {
+      if (await this.transcriptRepository.createPendingWindow(consultationId, windowNo)) created.add(windowNo);
+    }
+
+    // Workers take the minutes in order, because each minute needs the text of the one before.
+    const failedWindowNos = [];
+    let nextWindowNo = 1;
+    const worker = async () => {
+      while (nextWindowNo <= windowCount) {
+        const windowNo = nextWindowNo;
+        nextWindowNo += 1;
+        if (!(await this.#finishWindow(consultationId, windowNo, created.has(windowNo)))) {
+          failedWindowNos.push(windowNo);
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL, windowCount) }, worker));
+    return { failedWindowNos: failedWindowNos.sort((a, b) => a - b) };
+  }
+
+  // True when the minute is done.
+  async #finishWindow(consultationId, windowNo, isNew) {
+    for (;;) {
+      const window = await this.transcriptRepository.findWindow(consultationId, windowNo);
+      if (window?.status === 'done') return true;
+      const busy =
+        !isNew && window?.status === 'pending' && Date.now() - window.createdAt.getTime() < this.busyWindowMs;
+      if (!busy) break;
+      await sleep(this.pollMs);
+    }
+    try {
+      await this.transcribeWindow(consultationId, windowNo);
+      return true;
+    } catch (err) {
+      this.logger.warn({ err, consultationId, windowNo }, 'A minute could not be transcribed after the recording stopped');
+      return false;
+    }
   }
 
   // Safe to run twice: a minute that is already done is skipped. On error the minute is marked failed

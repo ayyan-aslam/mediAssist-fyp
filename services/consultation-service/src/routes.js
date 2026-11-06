@@ -12,6 +12,8 @@ export function createRouter({ patientController, consultationController }) {
 
   router.post('/consultations', consultationController.start);
   router.post('/consultations/:consultationId/audio-parts', audioUpload, consultationController.uploadPart);
+  router.post('/consultations/:consultationId/stop', consultationController.stop);
+  router.post('/consultations/:consultationId/retry', consultationController.retry);
   router.get('/consultations/:consultationId', consultationController.getById);
 
   router.get('/internal/consultations/:consultationId/patient-contact', consultationController.getPatientContact);

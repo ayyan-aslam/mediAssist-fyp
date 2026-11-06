@@ -11,3 +11,9 @@ export const notRecordingError = () =>
 
 export const recordingTooLongError = () =>
   new AppError(409, 'RECORDING_TOO_LONG', 'A recording can be up to 30 minutes long.');
+
+export const partsMissingError = (missingParts) =>
+  new AppError(409, 'PARTS_MISSING', 'Some audio parts did not arrive.', { missingParts });
+
+export const notFailedError = () =>
+  new AppError(409, 'NOT_FAILED', 'This consultation has not failed, so it cannot be tried again.');

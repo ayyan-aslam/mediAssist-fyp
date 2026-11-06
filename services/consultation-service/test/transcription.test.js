@@ -11,10 +11,15 @@ const NOTE = 'Mixed Urdu, Punjabi and English consultation.';
 const CONSULTATION_ID = 41;
 
 // TRANSCRIPT_WINDOW and AUDIO_PART in memory. OpenAI, S3 and ffmpeg are mocked.
-function createContext({ overlapParts = 1, previousWaitMs = 50 } = {}) {
+function createContext({ overlapParts = 1, previousWaitMs = 50, busyWindowMs = 1000 } = {}) {
   const windows = new Map();
   const window = (windowNo) => windows.get(windowNo);
   const transcriptRepository = {
+    createPendingWindow: vi.fn(async (consultationId, windowNo) => {
+      if (windows.has(windowNo)) return false;
+      addWindow(windowNo, 'pending');
+      return true;
+    }),
     findWindow: vi.fn(async (consultationId, windowNo) => (window(windowNo) ? { ...window(windowNo) } : null)),
     saveText: vi.fn(async (consultationId, windowNo, text) => {
       Object.assign(window(windowNo), { transcriptText: text, status: 'done' });
@@ -49,10 +54,12 @@ function createContext({ overlapParts = 1, previousWaitMs = 50 } = {}) {
     overlapParts,
     logger,
     previousWaitMs,
+    busyWindowMs,
     pollMs: 5,
   });
-  const addWindow = (windowNo, status, transcriptText = null) =>
-    windows.set(windowNo, { consultationId: CONSULTATION_ID, windowNo, status, transcriptText });
+  function addWindow(windowNo, status, transcriptText = null, createdAt = new Date()) {
+    windows.set(windowNo, { consultationId: CONSULTATION_ID, windowNo, status, transcriptText, createdAt });
+  }
 
   return { service, windows, addWindow, transcriptRepository, consultationRepository, s3Client, audioMerger, openAIClient, logger };
 }
@@ -250,6 +257,87 @@ describe('removeRepeatedStart', () => {
 
   it('works with Urdu letters', () => {
     expect(removeRepeatedStart('Patient: سر میں درد', 'Patient: سر میں درد ہے')).toBe('Patient: ہے');
+  });
+});
+
+describe('TranscriptionService.transcribeMissing', () => {
+  let ctx;
+  beforeEach(() => {
+    ctx = createContext();
+  });
+
+  const OLD = new Date(Date.now() - 60_000);
+
+  it('creates the rows of the missing minutes, including the last shorter one, and transcribes them', async () => {
+    ctx.addWindow(1, 'done', 'Doctor: Salam.');
+
+    const result = await ctx.service.transcribeMissing(CONSULTATION_ID, 14);
+
+    expect(result).toEqual({ failedWindowNos: [] });
+    expect([...ctx.windows.keys()].sort()).toEqual([1, 2, 3]);
+    expect([...ctx.windows.values()].every((w) => w.status === 'done')).toBe(true);
+    // Minute 1 was done already, so only minutes 2 and 3 were transcribed.
+    expect(ctx.openAIClient.transcribe).toHaveBeenCalledTimes(2);
+    expect(ctx.consultationRepository.findPartsInRange).toHaveBeenCalledWith(CONSULTATION_ID, 12, 18);
+  });
+
+  it('transcribes failed minutes and minutes pending for more than 20 seconds again', async () => {
+    ctx.addWindow(1, 'failed');
+    ctx.addWindow(2, 'pending', null, OLD);
+
+    const result = await ctx.service.transcribeMissing(CONSULTATION_ID, 12);
+
+    expect(result).toEqual({ failedWindowNos: [] });
+    expect(ctx.openAIClient.transcribe).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for a young pending minute that its own message is transcribing', async () => {
+    ctx.addWindow(1, 'pending');
+    setTimeout(() => Object.assign(ctx.windows.get(1), { status: 'done', transcriptText: 'Doctor: Salam.' }), 40);
+
+    const result = await ctx.service.transcribeMissing(CONSULTATION_ID, 6);
+
+    expect(result).toEqual({ failedWindowNos: [] });
+    expect(ctx.openAIClient.transcribe).not.toHaveBeenCalled();
+  });
+
+  it('transcribes a young pending minute itself when it is still pending after the wait', async () => {
+    ctx = createContext({ busyWindowMs: 30 });
+    ctx.addWindow(1, 'pending');
+
+    await ctx.service.transcribeMissing(CONSULTATION_ID, 6);
+
+    expect(ctx.openAIClient.transcribe).toHaveBeenCalledTimes(1);
+    expect(ctx.windows.get(1).status).toBe('done');
+  });
+
+  it('transcribes at most 3 minutes at the same time, in order', async () => {
+    let running = 0;
+    let most = 0;
+    const order = [];
+    vi.spyOn(ctx.service, 'transcribeWindow').mockImplementation(async (consultationId, windowNo) => {
+      order.push(windowNo);
+      running += 1;
+      most = Math.max(most, running);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      running -= 1;
+    });
+
+    const result = await ctx.service.transcribeMissing(CONSULTATION_ID, 36);
+
+    expect(result).toEqual({ failedWindowNos: [] });
+    expect(order).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(most).toBe(3);
+  });
+
+  it('returns the minutes that still fail', async () => {
+    ctx.addWindow(1, 'done', 'Doctor: Salam.');
+    ctx.openAIClient.transcribe.mockRejectedValue(new Error('OpenAI is not responding'));
+
+    const result = await ctx.service.transcribeMissing(CONSULTATION_ID, 12);
+
+    expect(result).toEqual({ failedWindowNos: [2] });
+    expect(ctx.windows.get(2).status).toBe('failed');
   });
 });
 

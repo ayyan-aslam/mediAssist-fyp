@@ -13,6 +13,9 @@ function createTestApp() {
   app.get('/conflict', () => {
     throw new AppError(409, 'ALREADY_ACTIVE', 'The account is already active.');
   });
+  app.get('/missing', () => {
+    throw new AppError(409, 'PARTS_MISSING', 'Some audio parts did not arrive.', { missingParts: [52, 53] });
+  });
   app.get('/crash', () => {
     throw new Error('database password is wrong');
   });
@@ -25,6 +28,14 @@ describe('errorHandler', () => {
     const res = await request(createTestApp()).get('/conflict');
     expect(res.status).toBe(409);
     expect(res.body).toEqual({ error: { code: 'ALREADY_ACTIVE', message: 'The account is already active.' } });
+  });
+
+  it('adds the extra fields of an AppError to the error object', async () => {
+    const res = await request(createTestApp()).get('/missing');
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({
+      error: { code: 'PARTS_MISSING', message: 'Some audio parts did not arrive.', missingParts: [52, 53] },
+    });
   });
 
   it('returns 500 INTERNAL_ERROR without the details of an unknown error', async () => {

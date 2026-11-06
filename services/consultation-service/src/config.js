@@ -18,6 +18,8 @@ const envSchema = z.object({
   OPENAI_TIMEOUT_SEC: z.coerce.number().positive().default(25),
   // Parts from the end of the previous minute added at the start of each minute as overlap.
   TRANSCRIPTION_OVERLAP_PARTS: z.coerce.number().int().min(0).max(5).default(1),
+  // A consultation that waited longer than this for the AI Pipeline's answer is marked failed (AI_TIMEOUT).
+  AI_ANSWER_TIMEOUT_SEC: z.coerce.number().int().positive().default(60),
 });
 
 export const config = loadConfig(envSchema);

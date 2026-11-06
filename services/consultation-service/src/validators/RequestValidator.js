@@ -43,6 +43,9 @@ const audioPartSchema = z.object({
     .transform((sec) => Math.max(1, Math.round(sec))),
 });
 
+// Up to 180 parts: 30 minutes (design doc 3.4.4).
+const stopSchema = z.object({ totalParts: z.int().positive().max(180) });
+
 function parse(schema, data) {
   const result = schema.safeParse(data ?? {});
   if (!result.success) {
@@ -74,6 +77,10 @@ export class RequestValidator {
   validateAudioPart(body, file) {
     if (!file) throw new AppError(400, 'VALIDATION_ERROR', 'audio: the audio file is missing');
     return parse(audioPartSchema, body);
+  }
+
+  validateStop(body) {
+    return parse(stopSchema, body);
   }
 
   // An ID in the URL. A value that is not a valid ID cannot exist, so notFoundError() is thrown.
