@@ -229,16 +229,14 @@ function RecentNoteRow({ item }: { item: SoapNoteListItem }) {
           {initials(item.patient.fullName)}
         </span>
         <div className="min-w-0">
-          <p dir="auto" className="truncate font-semibold">
+          <p dir="auto" className="font-semibold break-words">
             {item.patient.fullName}
           </p>
-          <p className="truncate text-sm text-muted-foreground tabular-nums">
-            {item.patient.phone}
-            <span className="sm:hidden"> · {formatDate(item.date)}</span>
-          </p>
+          <p className="text-sm text-muted-foreground tabular-nums">{item.patient.phone}</p>
+          <p className="text-sm text-muted-foreground sm:hidden">{formatDate(item.date)}</p>
         </div>
       </div>
-      <p className="hidden truncate sm:block">{formatDate(item.date)}</p>
+      <p className="hidden sm:block">{formatDate(item.date)}</p>
       <span className="hidden sm:block">
         <ConsultationStatusChip status="completed" />
       </span>

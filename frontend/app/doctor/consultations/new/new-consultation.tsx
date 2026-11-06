@@ -216,7 +216,8 @@ function SavedPatient({ patient }: { patient: ClinicalPatient }) {
                 {initials(patient.fullName)}
               </span>
               <div className="min-w-0 flex-1">
-                <p dir="auto" className="truncate font-display text-xl font-bold tracking-tight">
+                {/* The full name, so the doctor can be sure it is the right patient before recording. */}
+                <p dir="auto" className="font-display text-xl font-bold tracking-tight break-words">
                   {patient.fullName}
                 </p>
                 <p className="mt-0.5 whitespace-nowrap opacity-80">
@@ -234,10 +235,10 @@ function SavedPatient({ patient }: { patient: ClinicalPatient }) {
                 Edit
               </Button>
             </div>
-            <p className="mt-4 flex min-w-0 items-center gap-2 border-t border-current/10 pt-4 text-sm">
-              <Mail aria-hidden="true" className="size-4 shrink-0 opacity-80" />
+            <p className="mt-4 flex min-w-0 items-start gap-2 border-t border-current/10 pt-4 text-sm">
+              <Mail aria-hidden="true" className="mt-0.5 size-4 shrink-0 opacity-80" />
               {patient.email ? (
-                <span dir="ltr" className="truncate">
+                <span dir="ltr" className="min-w-0 break-all">
                   {patient.email}
                 </span>
               ) : (

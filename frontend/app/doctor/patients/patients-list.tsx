@@ -189,21 +189,19 @@ function PatientRow({ patient, query }: { patient: ClinicalPatient; query: strin
           {initials(patient.fullName)}
         </span>
         <div className="min-w-0">
-          <p dir="auto" className="truncate font-semibold">
+          {/* The whole name and phone are shown (not cut off), so a match is always visible. */}
+          <p dir="auto" className="font-semibold break-words">
             <Highlight text={patient.fullName} query={query} />
           </p>
-          <p className="truncate text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             <span className="tabular-nums">{patient.age}</span> years · {GENDER_LABEL[patient.gender]}
-            <span className="sm:hidden">
-              {" · "}
-              <span className="tabular-nums">
-                <Highlight text={patient.phone} query={query} />
-              </span>
-            </span>
+          </p>
+          <p className="text-sm text-muted-foreground tabular-nums sm:hidden">
+            <Highlight text={patient.phone} query={query} />
           </p>
         </div>
       </div>
-      <p className="hidden truncate tabular-nums sm:block">
+      <p className="hidden tabular-nums sm:block">
         <Highlight text={patient.phone} query={query} />
       </p>
       <p className="hidden truncate text-sm text-muted-foreground sm:block">{formatDate(patient.createdAt)}</p>

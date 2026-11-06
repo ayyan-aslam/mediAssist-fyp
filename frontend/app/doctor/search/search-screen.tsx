@@ -165,16 +165,14 @@ function ResultCard({ item, query }: { item: SoapNoteListItem; query: string }) 
         {initials(patient.fullName)}
       </span>
       <div className="min-w-0 flex-1">
-        <p dir="auto" className="truncate font-display text-lg font-bold tracking-tight">
+        {/* The whole name is shown (not cut off), so a match in it is always visible. */}
+        <p dir="auto" className="font-display text-lg font-bold tracking-tight break-words">
           <Highlight text={patient.fullName} query={query} />
         </p>
-        <p className="flex flex-wrap gap-x-1.5 text-sm text-muted-foreground">
-          <span className="tabular-nums">
-            <Highlight text={patient.phone} query={query} />
-          </span>
-          <span aria-hidden="true">·</span>
-          <span className="whitespace-nowrap">{formatDate(item.date)}</span>
+        <p className="text-sm text-muted-foreground tabular-nums">
+          <Highlight text={patient.phone} query={query} />
         </p>
+        <p className="text-sm text-muted-foreground">{formatDate(item.date)}</p>
       </div>
       <ArrowRight
         aria-hidden="true"
