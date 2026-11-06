@@ -36,7 +36,6 @@ export function AppShell({ area, children }: { area: Area; children: React.React
         </div>
         <div className="m-4 rounded-2xl bg-mint p-4 text-mint-foreground">
           <p className="text-sm font-bold">{AREA_LABEL[area]} module</p>
-          <p className="mt-1 text-xs leading-relaxed opacity-80">Patients, recording and SOAP notes arrive in the next release.</p>
         </div>
       </aside>
 

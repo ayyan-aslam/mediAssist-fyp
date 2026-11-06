@@ -85,6 +85,9 @@ model SoapNote {
   objective      String?
   assessment     String?
   plan           String?
+  // The AI Pipeline's full result (aiResult in soap.generated), saved as it is.
+  // Never read or changed by the doctor's edits. Phase 2 builds the draft prescription from it.
+  aiResult       Json?    @map("ai_result") @db.JsonB
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
 

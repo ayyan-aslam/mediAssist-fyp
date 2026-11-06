@@ -102,6 +102,24 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
     });
   });
 
+  it('saves the AI result in ai_result exactly as it was sent', async () => {
+    const patient = await patients.insert(doctorId, newPatient('03000000009'));
+    const { consultationId } = await consultations.create({
+      clinicalPatientId: patient.clinicalPatientId,
+      status: 'processing',
+      startedAt: new Date(),
+    });
+    const aiResult = {
+      soap: { subjective: 'Gala kharab ae 3 dinan ton', objective: null },
+      prescription: [{ name: 'Panadol', strength: '500 mg', dose: '1 tablet', notes: 'کھانے کے بعد' }],
+      warnings: [],
+    };
+
+    await prisma.soapNote.create({ data: { consultationId, plan: 'Rest', aiResult } });
+
+    expect((await prisma.soapNote.findUnique({ where: { consultationId } })).aiResult).toEqual(aiResult);
+  });
+
   it('deletes the audio parts, transcript windows and SOAP note with their consultation', async () => {
     const patient = await patients.insert(doctorId, newPatient('03000000008'));
     const { consultationId } = await consultations.create({
