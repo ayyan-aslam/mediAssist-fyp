@@ -2,8 +2,9 @@
 
 export type Role = "patient" | "doctor" | "admin";
 
+// Some errors carry extra fields, like `missingParts` of 409 PARTS_MISSING.
 export interface ApiErrorBody {
-  error: { code: string; message: string };
+  error: { code: string; message: string; [field: string]: unknown };
 }
 
 export interface Paged<T> {
@@ -108,4 +109,30 @@ export interface StartConsultationResponse {
   consultationId: number;
   status: "recording";
   startedAt: string;
+}
+
+export type ConsultationStatus = "recording" | "processing" | "completed" | "failed";
+
+// GET /consultations/{consultationId}
+export interface Consultation {
+  consultationId: number;
+  patient: { clinicalPatientId: number; fullName: string; phone: string };
+  status: ConsultationStatus;
+  failureReason: "TRANSCRIPTION_FAILED" | "AI_FAILED" | "AI_TIMEOUT" | null;
+  followUpDate: string | null;
+  startedAt: string;
+  endedAt: string | null;
+}
+
+// POST /consultations/{consultationId}/audio-parts (201 new part, 200 already saved)
+export interface AudioPartResponse {
+  partNo: number;
+  saved: true;
+}
+
+// POST /consultations/{consultationId}/stop
+export interface StopConsultationResponse {
+  consultationId: number;
+  status: "processing";
+  endedAt: string;
 }

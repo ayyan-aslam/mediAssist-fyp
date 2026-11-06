@@ -13,6 +13,7 @@
 // - Profile: phone 03000000000 (PHONE_TAKEN). Saved changes are kept until the page is reloaded.
 // - New consultation: phone 03214567890 is a saved patient (the doc example). Other numbers are new.
 //   Patients added or edited here are kept until the page is reloaded.
+// - Recording: every audio part is saved (201) and stop always succeeds.
 
 const DOCTOR = {
   userId: 16,
@@ -146,6 +147,29 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   ["POST", /^\/consultations$/, () => [201, { consultationId: 41, status: "recording", startedAt: new Date().toISOString() }]],
+  [
+    "GET",
+    /^\/consultations\/(\d+)$/,
+    (_, [id]) => [
+      200,
+      {
+        consultationId: Number(id),
+        patient: { clinicalPatientId: 7, fullName: "Bilal Hussain", phone: "03214567890" },
+        status: "recording",
+        failureReason: null,
+        followUpDate: null,
+        startedAt: new Date().toISOString(),
+        endedAt: null,
+      },
+    ],
+  ],
+  // The FormData body is not read here, so the answer does not carry the real part number.
+  ["POST", /^\/consultations\/(\d+)\/audio-parts$/, () => [201, { partNo: 1, saved: true }]],
+  [
+    "POST",
+    /^\/consultations\/(\d+)\/stop$/,
+    (_, [id]) => [200, { consultationId: Number(id), status: "processing", endedAt: new Date().toISOString() }],
+  ],
   ["GET", /^\/admin\/users$/, () => [200, { items: [ADMIN_USER], page: 1, pageSize: 20, total: 1 }]],
   ["GET", /^\/admin\/users\/(\d+)$/, () => [200, ADMIN_USER]],
   ["POST", /^\/admin\/users\/(\d+)\/suspend$/, (_, [id]) => [200, { userId: Number(id), accountStatus: "suspended" }]],

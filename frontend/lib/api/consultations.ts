@@ -1,12 +1,16 @@
 import { api } from "@/lib/api/client";
 import type {
+  AudioPartResponse,
   ClinicalPatient,
+  Consultation,
   CreateClinicalPatientRequest,
   FindClinicalPatientResponse,
   StartConsultationResponse,
+  StopConsultationResponse,
   UpdateClinicalPatientRequest,
 } from "@/lib/api/types";
 
+export const consultationQueryKey = (consultationId: number) => ["consultations", consultationId] as const;
 export const patientByPhoneQueryKey = (phone: string) => ["clinical-patients", "by-phone", phone] as const;
 
 // Consultation Service endpoints (design doc Section 5.5).
@@ -24,4 +28,26 @@ export const consultationsApi = {
 
   start: (clinicalPatientId: number) =>
     api<StartConsultationResponse>("/consultations", { method: "POST", body: { clinicalPatientId }, silent: true }),
+
+  get: (consultationId: number) => api<Consultation>(`/consultations/${consultationId}`, { silent: true }),
+
+  // One 10-second part as multipart/form-data: audio, partNo, durationSec.
+  uploadPart: (consultationId: number, part: { partNo: number; durationSec: number; audio: Blob }) => {
+    const form = new FormData();
+    form.append("audio", part.audio, `${part.partNo}.webm`);
+    form.append("partNo", String(part.partNo));
+    form.append("durationSec", String(part.durationSec));
+    return api<AudioPartResponse>(`/consultations/${consultationId}/audio-parts`, {
+      method: "POST",
+      body: form,
+      silent: true,
+    });
+  },
+
+  stop: (consultationId: number, totalParts: number) =>
+    api<StopConsultationResponse>(`/consultations/${consultationId}/stop`, {
+      method: "POST",
+      body: { totalParts },
+      silent: true,
+    }),
 };
