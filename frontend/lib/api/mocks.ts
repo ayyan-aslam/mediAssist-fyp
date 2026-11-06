@@ -170,6 +170,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/consultations\/(\d+)\/stop$/,
     (_, [id]) => [200, { consultationId: Number(id), status: "processing", endedAt: new Date().toISOString() }],
   ],
+  ["POST", /^\/consultations\/(\d+)\/retry$/, (_, [id]) => [200, { consultationId: Number(id), status: "processing" }]],
   ["GET", /^\/admin\/users$/, () => [200, { items: [ADMIN_USER], page: 1, pageSize: 20, total: 1 }]],
   ["GET", /^\/admin\/users\/(\d+)$/, () => [200, ADMIN_USER]],
   ["POST", /^\/admin\/users\/(\d+)\/suspend$/, (_, [id]) => [200, { userId: Number(id), accountStatus: "suspended" }]],
