@@ -66,8 +66,12 @@ export function AppShell({ area, children }: { area: Area; children: React.React
 
           <p className="hidden items-center gap-2 lg:flex">
             <span className="text-muted-foreground">{AREA_LABEL[area]}</span>
-            <span className="text-muted-foreground/50">/</span>
-            <span className="font-semibold">{current?.label}</span>
+            {current && (
+              <>
+                <span className="text-muted-foreground/50">/</span>
+                <span className="font-semibold">{current.label}</span>
+              </>
+            )}
           </p>
 
           <div className="ml-auto flex items-center gap-1">

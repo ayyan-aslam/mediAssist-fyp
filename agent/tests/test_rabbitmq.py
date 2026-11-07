@@ -176,6 +176,32 @@ def test_run_error_publishes_soap_generation_failed(exc, reason):
     channel.basic_ack.assert_called_once_with(delivery_tag=7)
 
 
+def test_failed_narrative_publishes_soap_generation_failed():
+    response = {**RESPONSE, "soap": {"subjective": "", "objective": None, "assessment": None,
+                                     "plan": {"notes": None, "prescription": []}},
+                "warnings": [{"node": "soap_narrative", "type": "failure",
+                              "detail": "AuthenticationError: Error code: 401"}]}
+    channel = deliver(rmq.TranscriptConsumer(url="amqp://x", run=MagicMock(return_value=response)), transcript_ready())
+
+    call, message = published(channel)
+    assert call["routing_key"] == "soap.generation.failed"
+    assert message["data"]["reason"] == "AI_NOT_AVAILABLE"
+    assert "401" in message["data"]["message"]
+    channel.basic_ack.assert_called_once_with(delivery_tag=7)
+
+
+def test_other_warnings_still_publish_soap_generated():
+    response = {**RESPONSE, "warnings": [
+        {"node": "node1_symptoms_rag", "type": "failure", "detail": "APITimeoutError"},
+        {"node": "soap_narrative", "type": "verification", "detail": "SOAP objective mentions a number ..."},
+    ]}
+    channel = deliver(rmq.TranscriptConsumer(url="amqp://x", run=MagicMock(return_value=response)), transcript_ready())
+
+    _, message = published(channel)
+    assert message["type"] == "soap.generated"
+    assert message["data"]["aiResult"] == response
+
+
 @pytest.mark.parametrize("transcript", ["", "   \n", None])
 def test_empty_transcript_is_bad_transcript(transcript):
     run = MagicMock()

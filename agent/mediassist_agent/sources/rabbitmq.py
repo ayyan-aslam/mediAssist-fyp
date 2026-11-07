@@ -37,6 +37,19 @@ class BadTranscript(ValueError):
     """The transcript is empty or not text."""
 
 
+class NarrativeNotWritten(RuntimeError):
+    """The LLM could not write the SOAP narrative after its retries, so there is no note to send."""
+
+
+def narrative_failure(response: dict) -> str | None:
+    """The error of the SOAP narrative when it failed, else None. Other nodes may fail: the note then still
+    goes out with their warnings."""
+    for w in response.get("warnings") or []:
+        if w.get("node") == "soap_narrative" and w.get("type") == "failure":
+            return w.get("detail") or "The SOAP narrative could not be written."
+    return None
+
+
 # ---------------------------------------------------------------- pure mapping (no RabbitMQ)
 def plan_text(plan: dict | None) -> str:
     """One line per prescribed medicine (empty fields left out), then the plan notes on their own line."""
@@ -81,7 +94,7 @@ def failure_reason(exc: BaseException) -> str:
     import openai
 
     # APITimeoutError is a subclass of APIConnectionError.
-    if _caused_by(exc, (openai.APIConnectionError, openai.RateLimitError)):
+    if _caused_by(exc, (openai.APIConnectionError, openai.RateLimitError, NarrativeNotWritten)):
         return "AI_NOT_AVAILABLE"
     if _caused_by(exc, (BadTranscript, UnicodeError)):
         return "BAD_TRANSCRIPT"
@@ -118,6 +131,10 @@ def answer(data: dict, run: Callable[[str, str], dict]) -> tuple[str, dict]:
         if not isinstance(transcript, str) or not transcript.strip():
             raise BadTranscript("The transcript is empty or not text.")
         response = run(transcript, str(consultation_id))
+        # An empty note is not an answer: the doctor gets "Try again" instead (6.4.5).
+        error = narrative_failure(response)
+        if error:
+            raise NarrativeNotWritten(error)
         return "soap.generated", soap_generated_data(consultation_id, attempt, response)
     except Exception as exc:
         log.exception("consultation %s attempt %s: run_consultation failed", consultation_id, attempt)
