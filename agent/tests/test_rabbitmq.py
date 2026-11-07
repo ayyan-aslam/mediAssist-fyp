@@ -63,26 +63,18 @@ def openai_error(cls):
 
 
 # ---------------------------------------------------------------- mapping
-def test_plan_has_one_line_per_medicine_then_notes():
+def test_plan_is_the_notes_only_without_the_medicines():
+    # The medicines are shown as their own prescription table, so they are not copied into the plan text.
     plan = {
-        "notes": "Warm salt water gargles.",
-        "prescription": [
-            {"name": "Panadol", "strength": "500 mg", "dose": "1 tablet", "frequency": "twice a day",
-             "duration": "3 days", "instructions": "after meals"},
-            {"name": "Augmentin", "strength": None, "dose": "", "frequency": "  ", "duration": "5 days"},
-        ],
+        "notes": "  Warm salt water gargles.  ",
+        "prescription": [{"name": "Panadol", "strength": "500 mg", "dose": "1 tablet", "frequency": "twice a day"}],
     }
-    assert rmq.plan_text(plan) == (
-        "Panadol, 500 mg, 1 tablet, twice a day, 3 days, after meals\n"
-        "Augmentin, 5 days\n"
-        "Warm salt water gargles."
-    )
+    assert rmq.plan_text(plan) == "Warm salt water gargles."
 
 
-def test_plan_without_medicines_or_notes():
-    assert rmq.plan_text({"notes": "Rest.", "prescription": []}) == "Rest."
-    assert rmq.plan_text({"notes": None, "prescription": [{"name": "Panadol"}]}) == "Panadol"
-    assert rmq.plan_text({"notes": None, "prescription": [{"name": None, "dose": ""}]}) == ""
+def test_plan_without_notes():
+    assert rmq.plan_text({"notes": None, "prescription": [{"name": "Panadol"}]}) == ""
+    assert rmq.plan_text({"prescription": []}) == ""
     assert rmq.plan_text(None) == ""
 
 
@@ -94,7 +86,7 @@ def test_soap_generated_maps_none_to_empty_and_keeps_ai_result_unchanged():
         "subjective": "Sore throat for 3 days.",
         "objective": "",
         "assessment": "Likely viral throat infection.",
-        "plan": "Panadol, 500 mg, 1 tablet, twice a day, 3 days\nWarm salt water gargles.",
+        "plan": "Warm salt water gargles.",
         "aiResult": RESPONSE,
     }
     assert data["aiResult"] is RESPONSE

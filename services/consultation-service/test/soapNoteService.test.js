@@ -82,6 +82,7 @@ function createContext() {
     consultation,
     notes,
     soapNoteRepository,
+    transcriptRepository,
     transcriptionService,
     eventPublisher,
     sseManager,
@@ -142,6 +143,37 @@ describe('SoapNoteService', () => {
         failureReason: 'TRANSCRIPTION_FAILED',
         message: FAILURE_MESSAGES.TRANSCRIPTION_FAILED,
       });
+    });
+
+    it('marks the consultation failed with NO_SPEECH and sends nothing to the AI Pipeline when the transcript is empty', async () => {
+      ctx.transcriptRepository.findWindows.mockResolvedValueOnce([
+        { windowNo: 1, transcriptText: '' },
+        { windowNo: 2, transcriptText: '  \n' },
+      ]);
+
+      await ctx.service.finishTranscript(CONSULTATION_ID, 1);
+
+      expect(ctx.consultation).toMatchObject({ status: 'failed', failureReason: 'NO_SPEECH', aiRequestedAt: null });
+      expect(ctx.eventPublisher.publish).not.toHaveBeenCalled();
+      expect(ctx.notifyDoctor).toHaveBeenCalledWith(DOCTOR_ID, 'consultation_failed', {
+        consultationId: CONSULTATION_ID,
+        failureReason: 'NO_SPEECH',
+        message: FAILURE_MESSAGES.NO_SPEECH,
+      });
+    });
+
+    it('failTranscript (dead letter) marks a processing consultation TRANSCRIPTION_FAILED and tells the doctor', async () => {
+      await ctx.service.failTranscript(CONSULTATION_ID);
+
+      expect(ctx.consultation).toMatchObject({ status: 'failed', failureReason: 'TRANSCRIPTION_FAILED' });
+      expect(ctx.notifyDoctor).toHaveBeenCalledWith(DOCTOR_ID, 'consultation_failed', expect.objectContaining({ failureReason: 'TRANSCRIPTION_FAILED' }));
+    });
+
+    it('failTranscript changes nothing for a consultation that already finished', async () => {
+      ctx.consultation.status = 'completed';
+      await ctx.service.failTranscript(CONSULTATION_ID);
+      expect(ctx.consultation.status).toBe('completed');
+      expect(ctx.notifyDoctor).not.toHaveBeenCalled();
     });
 
     it.each([['completed'], ['failed'], ['recording']])('skips a consultation that is %s', async (status) => {

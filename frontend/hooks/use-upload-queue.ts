@@ -148,6 +148,16 @@ export function useUploadQueue(consultationId: number) {
     void run();
   }, [run, update]);
 
+  // The recording was discarded: drops every part and stops uploading for good.
+  const cancel = useCallback(() => {
+    disposed.current = true;
+    fatal.current = null;
+    pending.current.clear();
+    parts.current.clear();
+    wake.current();
+    update({ retrying: false });
+  }, [update]);
+
   useEffect(() => {
     disposed.current = false;
     const online = () => {
@@ -166,5 +176,5 @@ export function useUploadQueue(consultationId: number) {
     };
   }, [update]);
 
-  return { state, add, resend, retry, waitUntilEmpty };
+  return { state, add, resend, retry, waitUntilEmpty, cancel };
 }

@@ -96,6 +96,16 @@ export class ConsultationRepository {
     });
   }
 
+  // Discard: deletes the consultation when its status is one of `statuses`, with its parts and transcript
+  // minutes (ON DELETE CASCADE). Returns the S3 keys of its parts, or null when the status changed meanwhile.
+  async deleteDiscardable(consultationId, statuses) {
+    return this.prisma.$transaction(async (tx) => {
+      const parts = await tx.audioPart.findMany({ where: { consultationId }, select: { fileKey: true } });
+      const { count } = await tx.consultation.deleteMany({ where: { consultationId, status: { in: statuses } } });
+      return count === 1 ? parts.map((part) => part.fileKey) : null;
+    });
+  }
+
   // Internal use only (Prescription Service): no doctor check.
   findPatientContact(consultationId) {
     return this.prisma.consultation.findUnique({

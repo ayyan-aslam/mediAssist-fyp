@@ -18,17 +18,19 @@ export class EventConsumer {
 
   // handler(message) gets the whole message (messageId, type, version, source, createdAt, data).
   // It must be safe to run twice with the same message.
-  consume(queue, handler, { prefetch = 10 } = {}) {
+  // onDeadLetter(message, err), optional: runs once the message has moved to the dead-letter queue, so the
+  // service can mark the work as failed instead of leaving it waiting. Its own errors are only logged.
+  consume(queue, handler, { prefetch = 10, onDeadLetter } = {}) {
     this.connection.onConnect(async (model) => {
       const channel = await model.createConfirmChannel();
       channel.on('error', (err) => this.logger.error({ err, queue }, 'RabbitMQ consumer channel error'));
       await channel.prefetch(prefetch);
-      await channel.consume(queue, (msg) => this.#handle(channel, queue, handler, msg), { noAck: false });
+      await channel.consume(queue, (msg) => this.#handle(channel, queue, handler, msg, onDeadLetter), { noAck: false });
       this.logger.info({ queue, prefetch }, 'Listening to queue');
     });
   }
 
-  async #handle(channel, queue, handler, msg) {
+  async #handle(channel, queue, handler, msg, onDeadLetter) {
     // RabbitMQ cancelled the consumer, for example because the queue was deleted.
     if (msg === null) {
       this.logger.error({ queue }, 'RabbitMQ cancelled the consumer');
@@ -41,11 +43,11 @@ export class EventConsumer {
       await handler(message);
       channel.ack(msg);
     } catch (err) {
-      await this.#fail(channel, queue, msg, message, err);
+      await this.#fail(channel, queue, msg, message, err, onDeadLetter);
     }
   }
 
-  async #fail(channel, queue, msg, message, err) {
+  async #fail(channel, queue, msg, message, err, onDeadLetter) {
     const tries = previousFailures(msg, queue) + 1;
     const log = {
       err,
@@ -75,6 +77,15 @@ export class EventConsumer {
     } catch (sendErr) {
       // The channel is gone. The message was not acked, so RabbitMQ delivers it again after the reconnect.
       this.logger.error({ ...log, err: sendErr }, 'Could not move the message after a failure');
+      return;
+    }
+
+    if (onDeadLetter && message) {
+      try {
+        await onDeadLetter(message, err);
+      } catch (hookErr) {
+        this.logger.error({ ...log, err: hookErr }, 'The dead-letter handler failed');
+      }
     }
   }
 }

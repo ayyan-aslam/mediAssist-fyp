@@ -93,11 +93,11 @@ export class SoapNoteRepository {
   // reads or changes the notes of another doctor's patients.
 
   // null when the consultation does not exist or belongs to another doctor; otherwise { soapNote } with
-  // soapNote null until the note is ready.
-  findSoapNote(consultationId, doctorId) {
+  // soapNote null until the note is ready. ai_result is large, so it is read only when asked for.
+  findSoapNote(consultationId, doctorId, { withAiResult = false } = {}) {
     return this.prisma.consultation.findFirst({
       where: { consultationId, clinicalPatient: { doctorId } },
-      select: { soapNote: { omit: { aiResult: true } } },
+      select: { soapNote: withAiResult ? true : { omit: { aiResult: true } } },
     });
   }
 
@@ -108,16 +108,31 @@ export class SoapNoteRepository {
       select: {
         startedAt: true,
         clinicalPatient: { select: { fullName: true, age: true, gender: true, phone: true } },
-        soapNote: { select: { subjective: true, objective: true, assessment: true, plan: true } },
+        soapNote: {
+          select: {
+            subjective: true,
+            objective: true,
+            assessment: true,
+            plan: true,
+            aiResult: true,
+            prescription: true,
+            symptoms: true,
+          },
+        },
       },
     });
   }
 
   // Saves only the sent parts. Returns the new updated_at, or null when there is no note of this doctor.
+  // A null prescription or symptoms list is saved as SQL NULL (back to the AI version).
   async update(consultationId, doctorId, changes) {
+    const data = { ...changes, updatedAt: new Date() };
+    for (const key of ['prescription', 'symptoms']) {
+      if (data[key] === null) data[key] = Prisma.DbNull;
+    }
     const rows = await this.prisma.soapNote.updateManyAndReturn({
       where: { consultationId, consultation: { clinicalPatient: { doctorId } } },
-      data: { ...changes, updatedAt: new Date() },
+      data,
       select: { updatedAt: true },
     });
     return rows[0]?.updatedAt ?? null;

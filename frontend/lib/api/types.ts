@@ -113,7 +113,8 @@ export interface StartConsultationResponse {
 
 export type ConsultationStatus = "recording" | "processing" | "completed" | "failed";
 
-export type FailureReason = "TRANSCRIPTION_FAILED" | "AI_FAILED" | "AI_TIMEOUT";
+// NO_SPEECH: the transcript was empty (silence or a very short recording), so it must be recorded again.
+export type FailureReason = "TRANSCRIPTION_FAILED" | "AI_FAILED" | "AI_TIMEOUT" | "NO_SPEECH";
 
 // GET /consultations/{consultationId}
 export interface Consultation {
@@ -154,12 +155,109 @@ export interface SoapNote {
   assessment: string;
   plan: string;
   updatedAt: string;
+  // What the AI Pipeline found, shown next to the note. null for a note without an AI answer.
+  aiInsights: AiInsights | null;
+}
+
+// symptoms and prescription are the doctor's edited lists when *Edited is true, else the AI's.
+export interface AiInsights {
+  symptoms: AiSymptom[];
+  symptomsEdited: boolean;
+  prescription: AiMedicine[];
+  prescriptionEdited: boolean;
+  forDoctorReview: AiMedicine[];
+  medicationHistory: AiMedicationHistory[];
+  warnings: AiWarning[];
+}
+
+export interface AiSymptom {
+  // Position of the AI symptom it came from; null for one the doctor added.
+  aiIndex: number | null;
+  symptom: string | null;
+  mention: string | null;
+  // The transcript line the symptom was found in.
+  sourceText: string | null;
+  // Symptom labels of the medicine datasets it matched.
+  matchedLabels: string[];
+}
+
+export interface AiMedicine {
+  // Position of the AI medicine it came from; null for one the doctor added.
+  aiIndex: number | null;
+  // Position in forDoctorReview: for a suggestion, and for a prescribed medicine the doctor accepted from one.
+  reviewIndex: number | null;
+  name: string | null;
+  genericName: string | null;
+  strength: string | null;
+  dose: string | null;
+  frequency: string | null;
+  duration: string | null;
+  route: string | null;
+  instructions: string | null;
+  // matched: found in the datasets; rag_only: a dataset suggestion; doctor_added: added or renamed by
+  // the doctor; anything else: not found.
+  matchStatus: string | null;
+  linkedSymptoms: string[];
+  // Why the AI suggests it (only for forDoctorReview).
+  suggestionReason: string | null;
+  info: AiMedicineInfo | null;
+}
+
+// From the Dawaai and DVAGO datasets. When both have text, it is labelled "Dawaai:" and "DVAGO:".
+export interface AiMedicineInfo {
+  indication: string | null;
+  sideEffects: string | null;
+  contraindications: string | null;
+  warnings: string | null;
+  precautions: string | null;
+  drugInteractions: string | null;
+  dosageReference: string | null;
+  howToUse: string | null;
+  mechanism: string | null;
+  matchedProducts: string[];
+  sources: string[];
+  urls: string[];
+}
+
+export interface AiMedicationHistory {
+  medicineName: string | null;
+  condition: string | null;
+  duration: string | null;
+  frequency: string | null;
+  status: string | null;
+  sourceText: string | null;
+}
+
+export interface AiWarning {
+  section: string | null;
+  message: string | null;
+  detail: string | null;
 }
 
 export type SoapPart = "subjective" | "objective" | "assessment" | "plan";
 
-// PATCH /consultations/{consultationId}/soap-note: only the parts that changed.
-export type SoapNoteChanges = Partial<Record<SoapPart, string>>;
+// PATCH /consultations/{consultationId}/soap-note: only the parts that changed. A null prescription or
+// symptoms list goes back to the AI version.
+export type SoapNoteChanges = Partial<Record<SoapPart, string>> & {
+  prescription?: PrescriptionEdit[] | null;
+  symptoms?: SymptomEdit[] | null;
+};
+
+export interface PrescriptionEdit {
+  aiIndex: number | null;
+  reviewIndex: number | null;
+  name: string;
+  genericName: string | null;
+  dose: string | null;
+  frequency: string | null;
+  duration: string | null;
+  instructions: string | null;
+}
+
+export interface SymptomEdit {
+  aiIndex: number | null;
+  symptom: string;
+}
 
 export interface UpdateSoapNoteResponse {
   updatedAt: string;

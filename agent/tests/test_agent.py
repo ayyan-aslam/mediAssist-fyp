@@ -412,6 +412,32 @@ def test_frequency_in_dose_field_is_moved():
     assert m.dose == "2 tablets"                       # a real dose is never touched
 
 
+def test_copied_sentence_or_question_is_not_a_schedule():
+    from mediassist_agent.nodes.node2_prescription import _drop_copied_sentences
+    # The patient's question, labelled "Doctor:" by the transcription, copied into frequency and instructions.
+    question = "Roz khana peena ni hai, ik wari theek ho jaye te chhad dawaan."
+    m = PrescribedMedicine(name="Amlodipine", frequency=question, instructions="Can I stop it once I feel better?")
+    assert _drop_copied_sentences(m) == ["frequency", "instructions"]
+    assert m.frequency is None and m.instructions is None
+    m = PrescribedMedicine(name="Amlodipine", frequency="once daily in the morning",
+                           instructions="Take daily; do not stop without the doctor's advice.")
+    assert _drop_copied_sentences(m) == [] and m.frequency == "once daily in the morning"
+
+
+def test_strength_is_taken_out_of_the_name():
+    from mediassist_agent.nodes.node2_prescription import _strip_strength_from_name
+    for name in ("DPN, 5 mg", "DPN 5mg", "DPN - 5 MG"):
+        m = PrescribedMedicine(name=name, strength="5 mg")
+        _strip_strength_from_name(m)
+        assert m.name == "DPN", name
+    m = PrescribedMedicine(name="Augmentin 625", strength="1 g")      # a different number stays
+    _strip_strength_from_name(m)
+    assert m.name == "Augmentin 625"
+    m = PrescribedMedicine(name="5 mg", strength="5 mg")              # never leaves an empty name
+    _strip_strength_from_name(m)
+    assert m.name == "5 mg"
+
+
 def test_combo_product_does_not_become_the_info_source():
     doctor = [PrescribedMedicine(name="Paracetamol", generic_name="Paracetamol")]
     rag = [RagMedicine(record_id="amadol", name="Amadol Extra", generic_name="Paracetamol (500mg); Caffeine (65mg)",

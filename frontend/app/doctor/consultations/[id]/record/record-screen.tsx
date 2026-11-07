@@ -4,7 +4,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { CircleAlert, CloudCheck, CloudUpload, FileSearch, MicOff, RotateCw, Square, TimerReset, WifiOff } from "lucide-react";
+import {
+  CircleAlert,
+  CloudCheck,
+  CloudUpload,
+  FileSearch,
+  MicOff,
+  Pause,
+  Play,
+  RotateCcw,
+  RotateCw,
+  Square,
+  TimerReset,
+  Trash,
+  WifiOff,
+} from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageTransition } from "@/components/shared/page-transition";
@@ -14,11 +28,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChunkedRecorder } from "@/hooks/use-chunked-recorder";
 import { useLeaveWarning } from "@/hooks/use-leave-warning";
+import { useStartConsultation } from "@/hooks/use-start-consultation";
 import { useUploadQueue, type UploadQueueState } from "@/hooks/use-upload-queue";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { ApiError } from "@/lib/api/client";
 import { consultationQueryKey, consultationsApi } from "@/lib/api/consultations";
 import type { Consultation } from "@/lib/api/types";
+import { cn } from "@/lib/utils";
 import { isMicrophoneProblem, MicrophoneHelp } from "./microphone-help";
 import { SoundLevel } from "./sound-level";
 
@@ -124,8 +140,52 @@ function Recorder({ consultation }: { consultation: Consultation }) {
     },
     onLimitReached: () => limitReachedRef.current(),
   });
-  const { start, stop: stopRecorder } = recorder;
+  const { start, stop: stopRecorder, pause, resume } = recorder;
   const { waitUntilEmpty, resend } = queue;
+
+  // Start over / discard: asked first, with the recording paused while the doctor decides.
+  const [confirm, setConfirm] = useState<"restart" | "discard" | null>(null);
+  const [discarding, setDiscarding] = useState(false);
+  const resumeAfterConfirmRef = useRef(false);
+  const startAgain = useStartConsultation();
+
+  const askConfirm = (kind: "restart" | "discard") => {
+    resumeAfterConfirmRef.current = recorder.status === "recording";
+    if (resumeAfterConfirmRef.current) pause();
+    setConfirm(kind);
+  };
+
+  const keepRecording = () => {
+    setConfirm(null);
+    if (resumeAfterConfirmRef.current) resume();
+  };
+
+  // Deletes this consultation and its audio, then opens a new recording (start over) or the patient.
+  const discardRecording = async () => {
+    const kind = confirm;
+    setDiscarding(true);
+    try {
+      await consultationsApi.discard(consultationId);
+    } catch (err) {
+      setDiscarding(false);
+      if (err instanceof ApiError && err.code === "CANNOT_DISCARD") {
+        toast.info("This recording was already stopped, so it was kept.");
+        router.replace(`/doctor/consultations/${consultationId}/processing`);
+        return;
+      }
+      toast.error(err instanceof ApiError ? err.message : "The recording could not be discarded. Please try again.");
+      return;
+    }
+    recorder.cancel();
+    queue.cancel();
+    writeParts(consultationId, null);
+    if (kind === "restart") {
+      startAgain.mutate(consultation.patient.clinicalPatientId);
+    } else {
+      toast.success("Recording discarded");
+      router.replace(`/doctor/patients/${consultation.patient.clinicalPatientId}`);
+    }
+  };
 
   // Waits until every part is saved, then POST /stop. On PARTS_MISSING the missing parts are
   // uploaded again from memory and stop is called again.
@@ -192,9 +252,13 @@ function Recorder({ consultation }: { consultation: Consultation }) {
   }, [start]);
 
   const recording = recorder.status === "recording";
-  const busy = stop?.step === "saving";
-  useWakeLock(recording || busy);
-  useLeaveWarning(recording || recorder.status === "interrupted" || busy || queue.state.pending > 0, LEAVE_MESSAGE);
+  const paused = recorder.status === "paused";
+  const busy = stop?.step === "saving" || discarding;
+  useWakeLock(recording || paused || busy);
+  useLeaveWarning(
+    recording || paused || recorder.status === "interrupted" || busy || queue.state.pending > 0,
+    LEAVE_MESSAGE,
+  );
 
   const header = (
     <div className="space-y-2">
@@ -220,6 +284,7 @@ function Recorder({ consultation }: { consultation: Consultation }) {
 
   const elapsed = Math.min(recorder.elapsedSec, MAX_SEC);
   const stopped = stop !== null;
+  const canDiscard = !stopped && (recording || paused || recorder.status === "interrupted");
 
   return (
     <div className="space-y-6">
@@ -250,6 +315,11 @@ function Recorder({ consultation }: { consultation: Consultation }) {
               <MicOff aria-hidden="true" className="size-4" />
               Microphone off
             </span>
+          ) : paused ? (
+            <span className="inline-flex items-center gap-2 rounded-full bg-highlight/20 px-3 py-1 text-sm font-semibold text-highlight">
+              <Pause aria-hidden="true" className="size-3.5 fill-current" />
+              Paused
+            </span>
           ) : (
             <span className="inline-flex items-center gap-2 rounded-full bg-rec/15 px-3 py-1 text-sm font-semibold">
               <span className="relative flex size-2.5">
@@ -265,10 +335,18 @@ function Recorder({ consultation }: { consultation: Consultation }) {
         <p
           role="timer"
           aria-label={`Recording time ${formatTime(elapsed)}`}
-          className="mt-8 text-center font-display text-7xl font-extrabold tracking-[-0.04em] tabular-nums sm:text-8xl"
+          className={cn(
+            "mt-8 text-center font-display text-7xl font-extrabold tracking-[-0.04em] tabular-nums transition-opacity sm:text-8xl",
+            paused && "animate-pulse opacity-60 motion-reduce:animate-none",
+          )}
         >
           {formatTime(elapsed)}
         </p>
+        {paused && (
+          <p role="status" className="mt-2 text-center text-sm font-medium text-navy-muted">
+            Nothing is recorded while paused. Press Resume to go on.
+          </p>
+        )}
 
         <div className="mt-6">
           <SoundLevel getLevel={recorder.getLevel} active={recording} />
@@ -285,7 +363,37 @@ function Recorder({ consultation }: { consultation: Consultation }) {
         )}
 
         <div className="mt-8">
-          {stop?.step === "error" ? (
+          {confirm && canDiscard ? (
+            <div role="alertdialog" aria-labelledby="discard-title" aria-describedby="discard-text" className="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
+              <p id="discard-title" className="font-display text-lg font-bold">
+                {confirm === "restart" ? "Start over from 00:00?" : "Discard this recording?"}
+              </p>
+              <p id="discard-text" className="mt-1 text-sm leading-relaxed text-navy-muted">
+                The {formatTime(elapsed)} recorded so far is deleted and no note is made.
+                {confirm === "restart" ? " A new recording starts for the same patient." : ""} This cannot be undone.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <Button
+                  size="lg"
+                  onClick={keepRecording}
+                  disabled={discarding}
+                  className="h-12 bg-white/10 text-navy-foreground ring-1 ring-white/15 hover:bg-white/15"
+                >
+                  Keep recording
+                </Button>
+                <Button size="lg" onClick={() => void discardRecording()} disabled={discarding} className="h-12 bg-rec text-white hover:bg-rec/90">
+                  {discarding ? (
+                    <Spinner className="size-5 text-current" label="Deleting" />
+                  ) : confirm === "restart" ? (
+                    <RotateCcw aria-hidden="true" data-icon="inline-start" />
+                  ) : (
+                    <Trash aria-hidden="true" data-icon="inline-start" />
+                  )}
+                  {discarding ? "Deleting…" : confirm === "restart" ? "Start over" : "Discard"}
+                </Button>
+              </div>
+            </div>
+          ) : stop?.step === "error" ? (
             <Button
               size="lg"
               onClick={retryStop}
@@ -295,19 +403,65 @@ function Recorder({ consultation }: { consultation: Consultation }) {
               Try again
             </Button>
           ) : (
-            <Button
-              size="lg"
-              onClick={() => void finish()}
-              disabled={stopped || recorder.status === "idle"}
-              className="h-14 w-full bg-brand-bright text-base text-navy hover:bg-brand-bright/90"
-            >
-              {stopped ? (
-                <Spinner className="size-5 text-current" label="Saving the audio" />
-              ) : (
-                <Square aria-hidden="true" data-icon="inline-start" className="fill-current" />
+            <div className={cn("grid gap-3", !stopped && (recording || paused) && "sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]")}>
+              {!stopped && (recording || paused) && (
+                <Button
+                  size="lg"
+                  onClick={paused ? resume : pause}
+                  aria-pressed={paused}
+                  className={cn(
+                    "h-14 w-full text-base",
+                    paused
+                      ? "bg-highlight text-navy hover:bg-highlight/90"
+                      : "bg-white/10 text-navy-foreground ring-1 ring-white/15 hover:bg-white/15",
+                  )}
+                >
+                  {paused ? (
+                    <Play aria-hidden="true" data-icon="inline-start" className="fill-current" />
+                  ) : (
+                    <Pause aria-hidden="true" data-icon="inline-start" className="fill-current" />
+                  )}
+                  {paused ? "Resume" : "Pause"}
+                </Button>
               )}
-              {stopped ? "Saving the audio…" : "Stop recording"}
-            </Button>
+              <Button
+                size="lg"
+                onClick={() => void finish()}
+                disabled={stopped || recorder.status === "idle"}
+                className="h-14 w-full bg-brand-bright text-base text-navy hover:bg-brand-bright/90"
+              >
+                {stopped ? (
+                  <Spinner className="size-5 text-current" label="Saving the audio" />
+                ) : (
+                  <Square aria-hidden="true" data-icon="inline-start" className="fill-current" />
+                )}
+                {stopped ? "Saving the audio…" : "Stop and create note"}
+              </Button>
+            </div>
+          )}
+
+          {canDiscard && !confirm && (
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => askConfirm("restart")}
+                className="text-navy-muted hover:bg-white/10 hover:text-navy-foreground"
+              >
+                <RotateCcw aria-hidden="true" data-icon="inline-start" />
+                Start over
+              </Button>
+              <span aria-hidden="true" className="h-4 w-px bg-white/15" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => askConfirm("discard")}
+                className="text-navy-muted hover:bg-rec/15 hover:text-rec"
+              >
+                <Trash aria-hidden="true" data-icon="inline-start" />
+                Discard
+              </Button>
+            </div>
           )}
         </div>
       </section>

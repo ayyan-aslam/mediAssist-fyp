@@ -18,5 +18,8 @@ export const partsMissingError = (missingParts) =>
 export const notFailedError = () =>
   new AppError(409, 'NOT_FAILED', 'This consultation has not failed, so it cannot be tried again.');
 
+export const cannotDiscardError = () =>
+  new AppError(409, 'CANNOT_DISCARD', 'Only a recording or a failed consultation can be deleted.');
+
 export const soapNotReadyError = () =>
   new AppError(409, 'SOAP_NOT_READY', 'The SOAP note is not ready yet.');

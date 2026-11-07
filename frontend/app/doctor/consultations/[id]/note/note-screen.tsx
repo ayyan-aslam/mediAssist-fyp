@@ -16,20 +16,47 @@ import { Textarea } from "@/components/ui/textarea";
 import { SOAP_PARTS, useSoapNoteEditor, type SaveState } from "@/hooks/use-soap-note-editor";
 import { ApiError } from "@/lib/api/client";
 import { consultationQueryKey, consultationsApi, patientQueryKey, soapNoteQueryKey } from "@/lib/api/consultations";
-import type { Consultation, SoapNote, SoapPart } from "@/lib/api/types";
+import type { Consultation, SoapNote, SoapNoteChanges, SoapPart } from "@/lib/api/types";
 import { GENDER_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { AiInsightsPanel, AiWarnings } from "./ai-insights";
 
 // A SOAP part is at most 10,000 characters (Consultation Service check).
 const MAX_PART_LENGTH = 10_000;
 const SHOW_COUNT_FROM = 9_000;
 
-const PARTS: Record<SoapPart, { title: string; hint: string }> = {
-  subjective: { title: "Subjective", hint: "What the patient says: complaints, history and how long." },
-  objective: { title: "Objective", hint: "What you found: examination, vital signs and test results." },
-  assessment: { title: "Assessment", hint: "Your diagnosis." },
-  plan: { title: "Plan", hint: "Medicines, tests, advice and follow-up." },
+const PARTS: Record<SoapPart, { letter: string; title: string; hint: string; placeholder: string; tone: string }> = {
+  subjective: {
+    letter: "S",
+    title: "Subjective",
+    hint: "What the patient says: complaints, history and how long.",
+    placeholder: "Fever for 3 days, worse at night. Took Panadol, little relief.",
+    tone: "bg-sky text-sky-foreground",
+  },
+  objective: {
+    letter: "O",
+    title: "Objective",
+    hint: "What you found: examination, vital signs and test results.",
+    placeholder: "Temperature 101 °F, BP 120/80 mmHg, pulse 96. Throat red.",
+    tone: "bg-mint text-mint-foreground",
+  },
+  assessment: {
+    letter: "A",
+    title: "Assessment",
+    hint: "Your diagnosis.",
+    placeholder: "Viral throat infection.",
+    tone: "bg-peach text-peach-foreground",
+  },
+  plan: {
+    letter: "P",
+    title: "Plan",
+    hint: "Medicines, tests, advice and follow-up.",
+    placeholder: "Panadol 500 mg twice a day for 3 days. CBC. Follow-up in 1 week.",
+    tone: "bg-secondary text-secondary-foreground",
+  },
 };
+
+const wordCount = (text: string) => (text.trim() ? text.trim().split(/\s+/).length : 0);
 
 const notRetried404Or409 = (count: number, err: Error) =>
   !(err instanceof ApiError && (err.status === 404 || err.status === 409)) && count < 2;
@@ -114,6 +141,18 @@ function NoteEditor({ consultation, note }: { consultation: Consultation; note: 
     }
   };
 
+  // The edited prescription or symptoms are saved at once, apart from the 30-second auto-save of the text.
+  const saveEdits = async (changes: SoapNoteChanges) => {
+    try {
+      await consultationsApi.updateSoapNote(consultation.consultationId, changes);
+      toast.success("Changes saved");
+      return true;
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "The changes could not be saved. Please try again.");
+      return false;
+    }
+  };
+
   const save = async () => {
     setFinishing(true);
     try {
@@ -157,11 +196,16 @@ function NoteEditor({ consultation, note }: { consultation: Consultation; note: 
         </Button>
       </div>
 
+      {note.aiInsights && <AiWarnings warnings={note.aiInsights.warnings} />}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
         <div className="min-w-0 space-y-4">
           {SOAP_PARTS.map((part) => (
             <SoapSection key={part} part={part} value={values[part]} onChange={(value) => setPart(part, value)} />
           ))}
+          {note.aiInsights && (
+            <AiInsightsPanel insights={note.aiInsights} onSaveEdits={saveEdits} />
+          )}
         </div>
         <PatientPanel consultation={consultation} />
       </div>
@@ -202,8 +246,9 @@ function SaveStatus({ state }: { state: SaveState }) {
 
 function SoapSection({ part, value, onChange }: { part: SoapPart; value: string; onChange: (value: string) => void }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  const { title, hint } = PARTS[part];
+  const { letter, title, hint, placeholder, tone } = PARTS[part];
   const id = `soap-${part}`;
+  const words = wordCount(value);
 
   // Grows with the text. Browsers without CSS field-sizing get the height set here.
   useLayoutEffect(() => {
@@ -214,13 +259,34 @@ function SoapSection({ part, value, onChange }: { part: SoapPart; value: string;
   }, [value]);
 
   return (
-    <section aria-labelledby={`${id}-title`} className="rounded-[1.5rem] border bg-card p-5 sm:p-6">
-      <h2 id={`${id}-title`} className="font-display text-xl font-bold tracking-tight">
-        <label htmlFor={id}>{title}</label>
-      </h2>
-      <p id={`${id}-hint`} className="mt-1 text-sm text-muted-foreground">
-        {hint}
-      </p>
+    <section
+      aria-labelledby={`${id}-title`}
+      className="rounded-[1.5rem] border bg-card p-5 transition-[border-color,box-shadow] focus-within:border-primary/40 focus-within:shadow-soft sm:p-6"
+    >
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden="true"
+          className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl font-display text-lg font-extrabold", tone)}
+        >
+          {letter}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 id={`${id}-title`} className="font-display text-xl font-bold tracking-tight">
+            <label htmlFor={id}>{title}</label>
+          </h2>
+          <p id={`${id}-hint`} className="mt-1 text-sm text-muted-foreground">
+            {hint}
+          </p>
+        </div>
+        <span
+          className={cn(
+            "mt-1 shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
+            words ? "bg-muted text-muted-foreground" : "bg-peach text-peach-foreground",
+          )}
+        >
+          {words ? `${words.toLocaleString("en-GB")} ${words === 1 ? "word" : "words"}` : "Empty"}
+        </span>
+      </div>
       <Textarea
         ref={ref}
         id={id}
@@ -229,8 +295,9 @@ function SoapSection({ part, value, onChange }: { part: SoapPart; value: string;
         maxLength={MAX_PART_LENGTH}
         onChange={(event) => onChange(event.target.value)}
         aria-describedby={`${id}-hint`}
+        placeholder={placeholder}
         rows={4}
-        className="mt-4 min-h-32 resize-none text-base leading-relaxed md:text-base"
+        className="mt-4 min-h-32 resize-none rounded-xl border-transparent bg-muted/50 px-4 py-3.5 text-base leading-relaxed placeholder:text-muted-foreground/70 hover:border-input focus-visible:bg-background md:text-base dark:bg-input/20"
       />
       {value.length >= SHOW_COUNT_FROM && (
         <p className="mt-2 text-right text-xs text-muted-foreground tabular-nums">

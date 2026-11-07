@@ -31,6 +31,7 @@ export const ROUTES = [
   { method: 'POST', path: '/consultations/:consultationId/stop', service: 'consultation', roles: DOCTOR },
   { method: 'POST', path: '/consultations/:consultationId/retry', service: 'consultation', roles: DOCTOR },
   { method: 'GET', path: '/consultations/:consultationId', service: 'consultation', roles: DOCTOR },
+  { method: 'DELETE', path: '/consultations/:consultationId', service: 'consultation', roles: DOCTOR },
   { method: 'GET', path: '/consultations/:consultationId/soap-note', service: 'consultation', roles: DOCTOR },
   { method: 'PATCH', path: '/consultations/:consultationId/soap-note', service: 'consultation', roles: DOCTOR },
   {

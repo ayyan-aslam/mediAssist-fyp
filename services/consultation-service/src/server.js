@@ -91,7 +91,8 @@ eventConsumer.consume(
 eventConsumer.consume(
   'consultation.consultation.recorded',
   ({ data }) => soapNoteService.finishTranscript(data.consultationId, data.totalParts),
-  { prefetch: 5 },
+  // After 3 failures nothing would finish the transcript: fail it, so the doctor can try again.
+  { prefetch: 5, onDeadLetter: ({ data }) => soapNoteService.failTranscript(data.consultationId) },
 );
 eventConsumer.consume('consultation.soap.generated', ({ data }) => soapNoteService.saveGenerated(data), {
   prefetch: 5,

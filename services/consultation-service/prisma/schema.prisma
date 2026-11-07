@@ -88,6 +88,11 @@ model SoapNote {
   // The AI Pipeline's full result (aiResult in soap.generated), saved as it is.
   // Never read or changed by the doctor's edits. Phase 2 builds the draft prescription from it.
   aiResult       Json?    @map("ai_result") @db.JsonB
+  // The doctor's edited prescription and symptoms; null until the doctor edits them (then shown instead
+  // of the AI version). Items: { aiIndex, reviewIndex, name, genericName, dose, frequency, duration,
+  // instructions } (reviewIndex: an accepted AI suggestion) and { aiIndex, symptom }.
+  prescription   Json?    @db.JsonB
+  symptoms       Json?    @db.JsonB
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
 

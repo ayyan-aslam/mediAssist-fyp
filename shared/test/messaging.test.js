@@ -310,6 +310,40 @@ describe('EventConsumer', () => {
     );
   });
 
+  it('runs onDeadLetter only after the 3rd failure, with the message and the error', async () => {
+    const onDeadLetter = vi.fn(async () => {});
+    const { channel } = await startConsumer(
+      async () => {
+        throw new Error('database is down');
+      },
+      { onDeadLetter },
+    );
+
+    await channel.onMessage(delivery({ failures: 1 }));
+    expect(onDeadLetter).not.toHaveBeenCalled();
+
+    await channel.onMessage(delivery({ failures: 2 }));
+    expect(onDeadLetter).toHaveBeenCalledExactlyOnceWith(body, expect.objectContaining({ message: 'database is down' }));
+  });
+
+  it('only logs an error of onDeadLetter, after the message was moved and acked', async () => {
+    const { channel, logger } = await startConsumer(
+      async () => {
+        throw new Error('database is down');
+      },
+      {
+        onDeadLetter: async () => {
+          throw new Error('still down');
+        },
+      },
+    );
+    const msg = delivery({ failures: 2 });
+
+    await channel.onMessage(msg);
+    expect(channel.ack).toHaveBeenCalledWith(msg);
+    expect(logger.error).toHaveBeenCalledWith(expect.objectContaining({ err: expect.objectContaining({ message: 'still down' }) }), expect.any(String));
+  });
+
   it('treats a message that is not JSON as a failure and logs the AMQP messageId', async () => {
     const handler = vi.fn();
     const { channel, logger } = await startConsumer(handler);

@@ -118,6 +118,17 @@ function createFakeRepositories() {
     async countParts(consultationId) {
       return audioParts.filter((p) => p.consultationId === consultationId).length;
     },
+    // Like DELETE ... WHERE status IN (...) with ON DELETE CASCADE: the parts and minutes go too.
+    async deleteDiscardable(id, statuses) {
+      const index = consultations.findIndex((c) => c.consultationId === id && statuses.includes(c.status));
+      if (index < 0) return null;
+      consultations.splice(index, 1);
+      const keys = audioParts.filter((p) => p.consultationId === id).map((p) => p.fileKey);
+      for (const list of [audioParts, windows]) {
+        for (let i = list.length - 1; i >= 0; i--) if (list[i].consultationId === id) list.splice(i, 1);
+      }
+      return keys;
+    },
     // Updates WHERE status = from, like updateMany. Returns true when a row changed.
     async markProcessing(id, endedAt) {
       return changeIf(id, 'recording', { status: 'processing', endedAt });
@@ -167,10 +178,12 @@ function createFakeRepositories() {
   const pageOf = (rows, { page, pageSize }) => rows.slice((page - 1) * pageSize, page * pageSize);
 
   const soapNoteRepository = {
-    async findSoapNote(consultationId, doctorId) {
+    async findSoapNote(consultationId, doctorId, { withAiResult = false } = {}) {
       if (!consultationOf(doctorId, consultationId)) return null;
       const note = noteOf(consultationId);
-      return { soapNote: note && { ...note } };
+      if (!note) return { soapNote: null };
+      const { aiResult, ...rest } = note;
+      return { soapNote: withAiResult ? { ...rest, aiResult: aiResult ?? null } : rest };
     },
     async findForPdf(consultationId, doctorId) {
       const consultation = consultationOf(doctorId, consultationId);
@@ -242,7 +255,7 @@ function createFakeRepositories() {
 
 export function createTestContext() {
   const fakes = createFakeRepositories();
-  const s3Client = { upload: vi.fn(async (key) => key) };
+  const s3Client = { upload: vi.fn(async (key) => key), deleteMany: vi.fn(async () => {}) };
   const eventPublisher = { publish: vi.fn(async (type, data) => ({ type, data })) };
   const logger = createLogger('test', 'silent');
   const sseManager = new SseManager({ logger });
@@ -266,6 +279,7 @@ export function createTestContext() {
       get: (url) => send(request(app).get(url)),
       post: (url) => send(request(app).post(url)),
       patch: (url) => send(request(app).patch(url)),
+      delete: (url) => send(request(app).delete(url)),
     };
   };
 

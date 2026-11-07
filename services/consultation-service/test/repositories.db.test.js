@@ -316,6 +316,13 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
     expect(await soapNotes.markFailed(consultationId, 'TRANSCRIPTION_FAILED')).toBeNull();
   });
 
+  // The database CHECK constraint must allow every reason the service uses.
+  it('accepts the NO_SPEECH failure reason', async () => {
+    const { consultationId } = await newConsultation('processing');
+    expect(await soapNotes.markFailed(consultationId, 'NO_SPEECH')).toEqual({ consultationId, doctorId });
+    expect(await read(consultationId)).toMatchObject({ status: 'failed', failureReason: 'NO_SPEECH' });
+  });
+
   it('sets ai_requested_at only for the current attempt while processing', async () => {
     const { consultationId } = await newConsultation('processing');
     const at = new Date();
@@ -353,6 +360,14 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
     const { soapNote } = await soapNotes.findSoapNote(consultationId, doctorId);
     expect(soapNote).toMatchObject({ soapNoteId: created.soapNoteId, plan: 'P' });
     expect(soapNote).not.toHaveProperty('aiResult');
+    const withAi = await soapNotes.findSoapNote(consultationId, doctorId, { withAiResult: true });
+    expect(withAi.soapNote).toMatchObject({ plan: 'P', aiResult: { a: 1 }, prescription: null, symptoms: null });
+
+    // The doctor's edited lists are saved as JSON, and null sets them back to SQL NULL.
+    await soapNotes.update(consultationId, doctorId, { symptoms: [{ aiIndex: null, symptom: 'fever' }] });
+    expect((await soapNotes.findSoapNote(consultationId, doctorId)).soapNote.symptoms).toEqual([{ aiIndex: null, symptom: 'fever' }]);
+    await soapNotes.update(consultationId, doctorId, { symptoms: null });
+    expect((await soapNotes.findSoapNote(consultationId, doctorId)).soapNote.symptoms).toBeNull();
 
     const updatedAt = await soapNotes.update(consultationId, doctorId, { plan: 'Panadol – کھانے کے بعد' });
 

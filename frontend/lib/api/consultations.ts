@@ -93,6 +93,8 @@ export const consultationsApi = {
   // After a failure: the next attempt, without recording again.
   retry: (consultationId: number) =>
     api<RetryConsultationResponse>(`/consultations/${consultationId}/retry`, { method: "POST", silent: true }),
+  // Deletes a consultation that is recording or failed, with its audio (204). Otherwise 409 CANNOT_DISCARD.
+  discard: (consultationId: number) => api<void>(`/consultations/${consultationId}`, { method: "DELETE", silent: true }),
 
   // Opening the note starts the editing session.
   getSoapNote: (consultationId: number) =>

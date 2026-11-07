@@ -1,4 +1,5 @@
 import {
+  cannotDiscardError,
   consultationNotFoundError,
   notFailedError,
   notRecordingError,
@@ -15,6 +16,9 @@ export const PARTS_PER_WINDOW = 6;
 export const MAX_PARTS = 180;
 
 export const audioPartKey = (consultationId, partNo) => `consultations/${consultationId}/parts/${partNo}.webm`;
+
+// The statuses a doctor can delete a consultation in.
+const DISCARDABLE = ['recording', 'failed'];
 
 // Runs the recording logic (design doc Diagram 5). A doctor sees only the consultations of his own
 // patients: another doctor's consultation is reported as not found (404), never as forbidden.
@@ -125,6 +129,26 @@ export class ConsultationService {
       throw err;
     }
     return { consultationId, status: 'processing', endedAt: toIso(endedAt) };
+  }
+
+  // Discard (or start over): deletes a consultation that is still recording, or that failed, with its audio
+  // and transcript. A processing consultation is busy and a completed one has a note, so those are kept.
+  async discard(doctorId, consultationId) {
+    const consultation = await this.consultationRepository.findByDoctorAndId(doctorId, consultationId);
+    if (!consultation) throw consultationNotFoundError();
+    if (!DISCARDABLE.includes(consultation.status)) throw cannotDiscardError();
+
+    const fileKeys = await this.consultationRepository.deleteDiscardable(consultationId, DISCARDABLE);
+    if (fileKeys === null) throw cannotDiscardError();
+    if (fileKeys.length > 0) {
+      try {
+        await this.s3Client.deleteMany(fileKeys);
+      } catch (err) {
+        // The consultation is gone, so the files are no longer used; they are only left in the bucket.
+        this.logger.error({ err, consultationId, files: fileKeys.length }, 'Could not delete the audio of a discarded consultation');
+      }
+    }
+    this.logger.info({ consultationId, status: consultation.status, parts: fileKeys.length }, 'Discarded a consultation');
   }
 
   // Try again after a failure: the next attempt, then consultation.recorded again. Nothing is recorded again;

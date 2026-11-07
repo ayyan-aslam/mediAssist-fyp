@@ -108,6 +108,80 @@ describe('consultations', () => {
     });
   });
 
+  describe('DELETE /consultations/{consultationId}', () => {
+    const upload = (partNo) =>
+      ctx
+        .as()
+        .post('/consultations/1/audio-parts')
+        .field('partNo', String(partNo))
+        .field('durationSec', '10')
+        .attach('audio', Buffer.from('fake webm audio'), { filename: `${partNo}.webm`, contentType: 'audio/webm' });
+
+    it('deletes a recording consultation with its parts and audio, and returns 204', async () => {
+      await start();
+      await upload(1);
+      await upload(2);
+
+      const res = await ctx.as().delete('/consultations/1');
+
+      expect(res.status).toBe(204);
+      expect(ctx.consultations).toHaveLength(0);
+      expect(ctx.audioParts).toHaveLength(0);
+      expect(ctx.s3Client.deleteMany).toHaveBeenCalledExactlyOnceWith([
+        'consultations/1/parts/1.webm',
+        'consultations/1/parts/2.webm',
+      ]);
+      expect((await ctx.as().get('/consultations/1')).status).toBe(404);
+    });
+
+    it('does not call S3 when nothing was uploaded yet', async () => {
+      await start();
+      expect((await ctx.as().delete('/consultations/1')).status).toBe(204);
+      expect(ctx.s3Client.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('still discards when the audio cannot be deleted from S3', async () => {
+      await start();
+      await upload(1);
+      ctx.s3Client.deleteMany.mockRejectedValueOnce(new Error('S3 is down'));
+
+      expect((await ctx.as().delete('/consultations/1')).status).toBe(204);
+      expect(ctx.consultations).toHaveLength(0);
+    });
+
+    it('deletes a failed consultation with its audio and transcript minutes', async () => {
+      await start();
+      await upload(1);
+      Object.assign(ctx.consultations[0], { status: 'failed', failureReason: 'NO_SPEECH' });
+      ctx.windows.push({ consultationId: 1, windowNo: 1, status: 'done', transcriptText: '' });
+
+      const res = await ctx.as().delete('/consultations/1');
+
+      expect(res.status).toBe(204);
+      expect(ctx.consultations).toHaveLength(0);
+      expect(ctx.windows).toHaveLength(0);
+      expect(ctx.s3Client.deleteMany).toHaveBeenCalledExactlyOnceWith(['consultations/1/parts/1.webm']);
+    });
+
+    it.each([['processing'], ['completed']])('returns 409 CANNOT_DISCARD for a %s consultation and keeps it', async (status) => {
+      await start();
+      ctx.consultations[0].status = status;
+
+      const res = await ctx.as().delete('/consultations/1');
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('CANNOT_DISCARD');
+      expect(ctx.consultations).toHaveLength(1);
+    });
+
+    it('returns 404 CONSULTATION_NOT_FOUND for another doctor’s consultation', async () => {
+      await start();
+      const res = await ctx.as(OTHER_DOCTOR_ID).delete('/consultations/1');
+      expect(res.status).toBe(404);
+      expect(ctx.consultations).toHaveLength(1);
+    });
+  });
+
   describe('GET /internal/consultations/{consultationId}/patient-contact', () => {
     it('returns the patient name, age, gender, phone and email', async () => {
       await start();

@@ -29,12 +29,151 @@ describe('SOAP notes', () => {
         assessment: 'Viral throat infection.',
         plan: 'Panadol 500 mg twice a day.',
         updatedAt: expect.stringMatching(/Z$/),
+        aiInsights: null,
       });
       expect(ctx.editSessionStore.sessions.get(1)).toMatchObject({
         doctorId: DOCTOR_ID,
         ipAddress: DOCTOR_IP,
         changed: false,
       });
+    });
+
+    it('returns the AI Pipeline answer as aiInsights, in camelCase', async () => {
+      ctx.addSoapNote(1, {
+        aiResult: {
+          symptoms: [{ symptom: 'fever', mention: 'bukhar', source_text: 'Patient: 3 din se bukhar hai.', matched_labels: ['Fever'] }],
+          soap: {
+            plan: {
+              notes: 'Rest.',
+              prescription: [
+                {
+                  name: 'Paracetamol 500 mg',
+                  generic_name: 'Paracetamol',
+                  strength: '500 mg',
+                  frequency: 'every 6 hours',
+                  match_status: 'matched',
+                  linked_symptoms: ['fever'],
+                  info: { side_effects: 'Rare.', sources: ['dawaai'], urls: ['https://dawaai.pk/x'], matched_products: ['Panadol'] },
+                },
+              ],
+              for_doctor_review: [{ name: 'Act-On', generic_name: 'Domperidone', suggestion_reason: 'For vomiting.', info: null }],
+            },
+            medication_history: [{ medicine_name: 'Glucophage', condition: 'diabetes', status: 'currently_taking' }],
+          },
+          warnings: [{ section: 'Symptom matching', node: 'node1', type: 'failure', message: 'Please review.', detail: 'timeout' }],
+        },
+      });
+
+      const res = await ctx.as().get('/consultations/1/soap-note');
+
+      expect(res.status).toBe(200);
+      const { aiInsights } = res.body;
+      expect(aiInsights.symptoms).toEqual([
+        { aiIndex: 0, symptom: 'fever', mention: 'bukhar', sourceText: 'Patient: 3 din se bukhar hai.', matchedLabels: ['Fever'] },
+      ]);
+      expect(aiInsights).toMatchObject({ symptomsEdited: false, prescriptionEdited: false });
+      expect(aiInsights.prescription[0]).toMatchObject({
+        name: 'Paracetamol 500 mg',
+        genericName: 'Paracetamol',
+        frequency: 'every 6 hours',
+        dose: null,
+        linkedSymptoms: ['fever'],
+        info: { sideEffects: 'Rare.', contraindications: null, sources: ['dawaai'], matchedProducts: ['Panadol'] },
+      });
+      expect(aiInsights.forDoctorReview).toEqual([
+        expect.objectContaining({ name: 'Act-On', suggestionReason: 'For vomiting.', info: null, linkedSymptoms: [] }),
+      ]);
+      expect(aiInsights.medicationHistory).toEqual([
+        { medicineName: 'Glucophage', condition: 'diabetes', duration: null, frequency: null, status: 'currently_taking', sourceText: null },
+      ]);
+      expect(aiInsights.warnings).toEqual([{ section: 'Symptom matching', message: 'Please review.', detail: 'timeout' }]);
+    });
+
+    it('keeps the dataset info of an accepted AI suggestion in the edited prescription', async () => {
+      ctx.addSoapNote(1, {
+        aiResult: {
+          soap: {
+            plan: {
+              prescription: [],
+              for_doctor_review: [
+                { name: 'Act-On', generic_name: 'Domperidone', match_status: 'rag_only', linked_symptoms: ['vomiting'], suggestion_reason: 'For vomiting.', info: { side_effects: 'Dry mouth.' } },
+              ],
+            },
+          },
+        },
+        prescription: [{ aiIndex: null, reviewIndex: 0, name: 'Act-On', genericName: 'Domperidone', dose: '10 mg', frequency: 'Three times a day', duration: null, instructions: null }],
+      });
+
+      const { aiInsights } = (await ctx.as().get('/consultations/1/soap-note')).body;
+
+      expect(aiInsights.forDoctorReview[0]).toMatchObject({ aiIndex: null, reviewIndex: 0, name: 'Act-On' });
+      expect(aiInsights.prescription).toEqual([
+        expect.objectContaining({
+          aiIndex: null,
+          reviewIndex: 0,
+          name: 'Act-On',
+          dose: '10 mg',
+          frequency: 'Three times a day',
+          matchStatus: 'rag_only',
+          linkedSymptoms: ['vomiting'],
+          suggestionReason: null,
+          info: expect.objectContaining({ sideEffects: 'Dry mouth.' }),
+        }),
+      ]);
+    });
+
+    it('gives empty lists for a partial AI answer', async () => {
+      ctx.addSoapNote(1, { aiResult: { soap: { plan: null }, symptoms: 'not a list' } });
+
+      const res = await ctx.as().get('/consultations/1/soap-note');
+
+      expect(res.body.aiInsights).toEqual({
+        symptoms: [],
+        symptomsEdited: false,
+        prescription: [],
+        prescriptionEdited: false,
+        forDoctorReview: [],
+        medicationHistory: [],
+        warnings: [],
+      });
+    });
+
+    it('shows the doctor’s edited prescription and symptoms instead of the AI ones', async () => {
+      const info = { side_effects: 'Rare.' };
+      ctx.addSoapNote(1, {
+        aiResult: {
+          symptoms: [
+            { symptom: 'fever', source_text: 'Patient: bukhar hai.', matched_labels: ['Fever'] },
+            { symptom: 'cough', source_text: 'Patient: khansi hai.', matched_labels: ['Cough'] },
+          ],
+          soap: { plan: { prescription: [{ name: 'Panadol 500 mg', strength: '500 mg', linked_symptoms: ['fever'], match_status: 'matched', info }] } },
+        },
+        prescription: [
+          { aiIndex: 0, name: 'panadol 500 mg', genericName: null, dose: '1 tablet', frequency: 'twice a day', duration: '3 days', instructions: null },
+          { aiIndex: null, name: 'ORS', genericName: null, dose: '1 sachet', frequency: null, duration: null, instructions: 'In 1 litre of water' },
+        ],
+        symptoms: [{ aiIndex: 0, symptom: 'Fever' }, { aiIndex: 1, symptom: 'dry cough' }, { aiIndex: null, symptom: 'weakness' }],
+      });
+
+      const { aiInsights } = (await ctx.as().get('/consultations/1/soap-note')).body;
+
+      expect(aiInsights.prescriptionEdited).toBe(true);
+      // Same medicine (case does not matter): the dataset info and linked symptoms stay.
+      expect(aiInsights.prescription[0]).toMatchObject({
+        aiIndex: 0,
+        dose: '1 tablet',
+        frequency: 'twice a day',
+        matchStatus: 'matched',
+        linkedSymptoms: ['fever'],
+        info: { sideEffects: 'Rare.' },
+      });
+      expect(aiInsights.prescription[1]).toMatchObject({ aiIndex: null, reviewIndex: null, name: 'ORS', matchStatus: 'doctor_added', info: null });
+      expect(aiInsights.symptomsEdited).toBe(true);
+      expect(aiInsights.symptoms.map((s) => [s.symptom, s.sourceText, s.matchedLabels])).toEqual([
+        ['Fever', 'Patient: bukhar hai.', ['Fever']],
+        ['dry cough', null, []],
+        ['weakness', null, []],
+      ]);
     });
 
     it('returns 409 SOAP_NOT_READY while the note is not ready', async () => {
@@ -69,6 +208,50 @@ describe('SOAP notes', () => {
       expect(note.updatedAt > new Date('2026-10-07T09:19:12Z')).toBe(true);
       expect(note).toMatchObject({ plan: 'Panadol for 5 days.', subjective: 'Sore throat for 3 days.' });
       expect(ctx.editSessionStore.sessions.get(1)).toMatchObject({ changed: true, doctorId: DOCTOR_ID });
+    });
+
+    it('saves the edited prescription and symptoms, and null goes back to the AI version', async () => {
+      const note = ctx.addSoapNote(1);
+
+      const res = await ctx
+        .as()
+        .patch('/consultations/1/soap-note')
+        .send({
+          prescription: [{ aiIndex: 0, name: ' Panadol 500 mg ', dose: '1 tablet', frequency: '', duration: '3 days' }],
+          symptoms: [{ symptom: 'fever' }],
+        });
+
+      expect(res.status).toBe(200);
+      expect(note.prescription).toEqual([
+        {
+          aiIndex: 0,
+          reviewIndex: null,
+          name: 'Panadol 500 mg',
+          genericName: null,
+          dose: '1 tablet',
+          frequency: null,
+          duration: '3 days',
+          instructions: null,
+        },
+      ]);
+      expect(note.symptoms).toEqual([{ aiIndex: null, symptom: 'fever' }]);
+      expect(ctx.editSessionStore.sessions.get(1)).toMatchObject({ changed: true });
+
+      await ctx.as().patch('/consultations/1/soap-note').send({ prescription: null });
+      expect(note.prescription).toBeNull();
+      expect(note.symptoms).toEqual([{ aiIndex: null, symptom: 'fever' }]);
+    });
+
+    it.each([
+      ['a medicine without a name', { prescription: [{ name: ' ' }] }],
+      ['an unknown medicine field', { prescription: [{ name: 'Panadol', price: 10 }] }],
+      ['an empty symptom', { symptoms: [{ symptom: '' }] }],
+      ['too many symptoms', { symptoms: Array.from({ length: 51 }, () => ({ symptom: 'x' })) }],
+    ])('returns 400 VALIDATION_ERROR for %s', async (_, body) => {
+      ctx.addSoapNote(1);
+      const res = await ctx.as().patch('/consultations/1/soap-note').send(body);
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
 
     it('saves an empty part (null) as an empty string', async () => {

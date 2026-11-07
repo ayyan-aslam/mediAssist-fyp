@@ -53,8 +53,48 @@ const soapPart = z
   .nullable()
   .optional()
   .transform((value) => (value === null ? '' : value));
+// The doctor's edited prescription and symptoms. aiIndex: the AI item it came from, or null for a new one;
+// reviewIndex: the AI suggestion (for_doctor_review) the doctor accepted. null for the whole list goes back
+// to the AI version.
+const optionalText = (max) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .nullable()
+    .optional()
+    .transform((value) => value || null);
+const aiIndex = z.int().min(0).max(99).nullable().default(null);
+const prescriptionSchema = z
+  .array(
+    z.strictObject({
+      aiIndex,
+      reviewIndex: aiIndex,
+      name: z.string().trim().min(1).max(200),
+      genericName: optionalText(200),
+      dose: optionalText(100),
+      frequency: optionalText(100),
+      duration: optionalText(100),
+      instructions: optionalText(500),
+    }),
+  )
+  .max(30)
+  .nullable()
+  .optional();
+const symptomsSchema = z
+  .array(z.strictObject({ aiIndex, symptom: z.string().trim().min(1).max(100) }))
+  .max(50)
+  .nullable()
+  .optional();
 const soapNoteChangesSchema = z
-  .strictObject({ subjective: soapPart, objective: soapPart, assessment: soapPart, plan: soapPart })
+  .strictObject({
+    subjective: soapPart,
+    objective: soapPart,
+    assessment: soapPart,
+    plan: soapPart,
+    prescription: prescriptionSchema,
+    symptoms: symptomsSchema,
+  })
   .refine((changes) => Object.values(changes).some((value) => value !== undefined), 'send at least one part');
 
 // Lists and pages (design doc 5.1.2). Query values arrive as strings.

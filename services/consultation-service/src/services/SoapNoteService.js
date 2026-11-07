@@ -3,6 +3,7 @@ export const FAILURE_MESSAGES = {
   TRANSCRIPTION_FAILED: 'Some audio could not be processed. Please try again.',
   AI_FAILED: 'The SOAP note could not be written. Please try again.',
   AI_TIMEOUT: 'The SOAP note is taking too long. Please try again.',
+  NO_SPEECH: 'No speech was heard in the recording. Please record the consultation again.',
 };
 
 // soap.generated sends an empty string when a part has nothing, but null is saved as an empty string too.
@@ -49,6 +50,13 @@ export class SoapNoteService {
       .map((window) => window.transcriptText?.trim())
       .filter(Boolean)
       .join('\n');
+    // Silence or a very short recording: the AI Pipeline cannot write a note from nothing, and trying
+    // again would send the same empty transcript, so the doctor is asked to record again.
+    if (!transcript) {
+      this.logger.warn({ consultationId }, 'The transcript is empty. No speech was heard.');
+      await this.#fail(consultationId, 'NO_SPEECH');
+      return;
+    }
     const attempt = consultation.soapAttempt;
     const durationSec = await this.soapNoteRepository.getDurationSec(consultationId, totalParts);
 
@@ -67,6 +75,13 @@ export class SoapNoteService {
       transcript,
     });
     this.logger.info({ consultationId, attempt, windows: windows.length }, 'Sent the transcript to the AI Pipeline');
+  }
+
+  // consultation.recorded failed 3 times and went to the dead-letter queue: without this the consultation
+  // would stay processing for ever (the AI answer check only covers transcripts that were sent).
+  async failTranscript(consultationId) {
+    this.logger.error({ consultationId }, 'Could not finish the transcript. Marking the consultation failed.');
+    await this.#fail(consultationId, 'TRANSCRIPTION_FAILED');
   }
 
   // soap.generated (6.4.4): saved only for the current attempt, when no note exists and it is processing.

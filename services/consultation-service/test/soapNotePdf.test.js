@@ -45,6 +45,28 @@ describe('GET /consultations/{id}/soap-note/pdf', () => {
     await ctx.as().patch('/consultations/1/soap-note').send({ plan: 'Panadol 500 mg twice a day. '.repeat(350) });
     expect(pageCount((await download()).body)).toBeGreaterThan(1);
 
+    // With the AI symptoms, history and prescription (the doctor's edited version), still a valid PDF.
+    const note = ctx.soapNotes[0];
+    note.aiResult = {
+      symptoms: [{ symptom: 'fever' }, { symptom: 'headache' }],
+      soap: { medication_history: [{ medicine_name: 'Glucophage 500', condition: 'diabetes', status: 'currently_taking' }] },
+    };
+    note.prescription = Array.from({ length: 40 }, (_, i) => ({
+      aiIndex: null,
+      name: `Medicine ${i + 1}`,
+      genericName: 'Generic name',
+      dose: '1 tablet',
+      frequency: 'Twice a day',
+      duration: '5 days',
+      instructions: 'After meals with a full glass of water',
+    }));
+    note.plan = 'Rest.';
+    const withAi = await download();
+    expect(withAi.status).toBe(200);
+    expect(withAi.body.subarray(0, 5).toString()).toBe('%PDF-');
+    // 40 medicines do not fit on one page: the table goes on, with its header, on the next.
+    expect(pageCount(withAi.body)).toBeGreaterThan(1);
+
     // Another doctor gets 404, not 403.
     const other = await download(OTHER_DOCTOR_ID);
     expect(other.status).toBe(404);

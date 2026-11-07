@@ -30,7 +30,6 @@ SOURCE = "ai-pipeline"
 MAX_TRIES = 3
 RECONNECT_SECONDS = 5
 MESSAGE_MAX_CHARS = 300
-PRESCRIPTION_FIELDS = ("name", "strength", "dose", "frequency", "duration", "instructions")
 
 
 class BadTranscript(ValueError):
@@ -52,17 +51,9 @@ def narrative_failure(response: dict) -> str | None:
 
 # ---------------------------------------------------------------- pure mapping (no RabbitMQ)
 def plan_text(plan: dict | None) -> str:
-    """One line per prescribed medicine (empty fields left out), then the plan notes on their own line."""
-    plan = plan or {}
-    lines = []
-    for item in plan.get("prescription") or []:
-        parts = [str(item[f]).strip() for f in PRESCRIPTION_FIELDS if item.get(f) and str(item[f]).strip()]
-        if parts:
-            lines.append(", ".join(parts))
-    notes = (plan.get("notes") or "").strip()
-    if notes:
-        lines.append(notes)
-    return "\n".join(lines)
+    """The plan notes only (tests, advice, follow-up), in English. The prescribed medicines are not copied
+    into the text: they travel in aiResult and are shown as their own prescription table (app and PDF)."""
+    return ((plan or {}).get("notes") or "").strip()
 
 
 def soap_generated_data(consultation_id, attempt, response: dict) -> dict:

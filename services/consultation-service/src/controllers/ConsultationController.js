@@ -48,6 +48,14 @@ export class ConsultationController {
     res.json(await this.consultationService.stop(doctorId, consultationId, totalParts));
   };
 
+  // 204 No Content: the recording and its audio are deleted.
+  discard = async (req, res) => {
+    const doctorId = currentDoctorId(req);
+    const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);
+    await this.consultationService.discard(doctorId, consultationId);
+    res.status(204).end();
+  };
+
   retry = async (req, res) => {
     const doctorId = currentDoctorId(req);
     const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);

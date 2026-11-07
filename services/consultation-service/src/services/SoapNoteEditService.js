@@ -1,4 +1,5 @@
 import { consultationNotFoundError, soapNotReadyError } from '../errors.js';
+import { toAiInsights } from './aiInsights.js';
 
 // audit.event soap_note_change (design doc 6.4.12) for one editing session, at the time of its last edit.
 export function soapNoteChangeEvent(session) {
@@ -19,6 +20,7 @@ const toSoapNote = (note) => ({
   assessment: note.assessment,
   plan: note.plan,
   updatedAt: note.updatedAt.toISOString(),
+  aiInsights: toAiInsights(note.aiResult, { prescription: note.prescription, symptoms: note.symptoms }),
 });
 
 // Opens the SOAP note, saves the auto-save changes and ends the editing session (design doc Diagram 12).
@@ -32,7 +34,7 @@ export class SoapNoteEditService {
   }
 
   async open(consultationId, doctorId, ipAddress) {
-    const note = await this.#findSoapNote(consultationId, doctorId);
+    const note = await this.#findSoapNote(consultationId, doctorId, { withAiResult: true });
     this.editSessionStore.startSession(consultationId, doctorId, ipAddress);
     return toSoapNote(note);
   }
@@ -63,8 +65,8 @@ export class SoapNoteEditService {
     return { changed: true };
   }
 
-  async #findSoapNote(consultationId, doctorId) {
-    const row = await this.soapNoteRepository.findSoapNote(consultationId, doctorId);
+  async #findSoapNote(consultationId, doctorId, options) {
+    const row = await this.soapNoteRepository.findSoapNote(consultationId, doctorId, options);
     if (!row) throw consultationNotFoundError();
     if (!row.soapNote) throw soapNotReadyError();
     return row.soapNote;

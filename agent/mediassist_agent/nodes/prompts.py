@@ -34,7 +34,20 @@ IGNORE (do not output):
 For each prescribed medicine fill: name (as said), generic_name (only if stated), strength, dose,
 frequency, duration, route, instructions, and source_text = an EXACT word-for-word quote from the transcript
 (it is verified automatically). Any detail the doctor did not say must be null.
-Never guess a dose or frequency. If nothing was prescribed, return an empty list."""
+Never guess a dose or frequency. If nothing was prescribed, return an empty list.
+
+How to fill the fields:
+- name: the medicine name only (e.g. "Amlodipine"), without the strength or punctuation; the strength goes in
+  strength (e.g. "5 mg").
+- frequency: a SHORT schedule in plain English (e.g. "once daily", "twice a day", "at night", "every 6 hours"),
+  translated from Urdu/Punjabi ("roz" -> "daily", "din mein do baar" -> "twice a day"). null if no schedule
+  was said. Never copy a whole sentence into it.
+- duration: short English (e.g. "5 days", "long-term"). instructions: one short English sentence with what the
+  DOCTOR decided (e.g. "Take daily; do not stop without the doctor's advice", "After meals").
+- Read the whole exchange about the medicine before filling a field. A question ("roz khana hai? theek ho jaye
+  te chhad dawaan?" = "must I take it daily? can I stop once I feel better?") is NOT an instruction, even if the
+  transcript labels its speaker wrongly. Use what the doctor answers or decides afterwards (e.g. "khud band mat
+  karna" = "do not stop it on your own"). Never write a statement that is later corrected or contradicted."""
 
 HISTORY = """You extract the patient's PREVIOUS MEDICAL HISTORY from a consultation transcript:
 past diseases/problems and medicines the patient took BEFORE this consultation.
@@ -56,10 +69,13 @@ You are given the cleaned transcript plus structured data already extracted by o
 - objective: ONLY examination findings / vitals actually stated in the transcript; null if none.
 - assessment: ONLY the impression/diagnosis the doctor stated; null if the doctor gave none.
   Do not diagnose yourself.
-- plan_notes: non-medicine plan items the doctor said (tests, follow-up, lifestyle advice); null if none.
+- plan_notes: non-medicine plan items the doctor said (tests, follow-up, lifestyle advice), as concise English
+  clinical prose; null if none.
 Do NOT list medicines - the prescription is attached separately by the system.
+Write every part in English, even when the consultation is in Urdu or Punjabi; never paste Urdu/Punjabi words.
 Never add facts that are not in the transcript. Every number you write (temperature, BP, durations, doses)
-must appear in the transcript - it is verified automatically."""
+must appear in the transcript - it is verified automatically. Do not turn an amount said in words into a new
+number (write "half an hour" for "aadha ghanta", not "30 minutes")."""
 
 SUGGESTION_REVIEW = """You are a careful clinical pharmacist reviewing medicine SUGGESTIONS that a search over a
 Pakistani medicine database (Dawaai / DVAGO) produced for each of a patient's symptoms. The doctor will see

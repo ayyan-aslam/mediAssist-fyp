@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
-import { Check, CircleAlert, FileCheck, FileSearch, FileText, Mic, RotateCw, WifiOff } from "lucide-react";
+import { Check, CircleAlert, FileCheck, FileSearch, FileText, Mic, MicOff, RotateCw, Trash, WifiOff } from "lucide-react";
+import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageTransition } from "@/components/shared/page-transition";
 import { Spinner } from "@/components/shared/spinner";
@@ -14,8 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ConsultationEventsStatus } from "@/context/consultation-events-context";
 import { useConsultationEvents } from "@/hooks/use-consultation-events";
+import { useStartConsultation } from "@/hooks/use-start-consultation";
 import { ApiError } from "@/lib/api/client";
-import { consultationQueryKey, consultationsApi } from "@/lib/api/consultations";
+import { consultationQueryKey, consultationsApi, patientSoapNotesQueryKey, recentSoapNotesQueryKey } from "@/lib/api/consultations";
 import type { Consultation, FailureReason } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +26,7 @@ const FAILURE_MESSAGES: Record<FailureReason, string> = {
   TRANSCRIPTION_FAILED: "Some audio could not be processed. Please try again.",
   AI_FAILED: "The SOAP note could not be written. Please try again.",
   AI_TIMEOUT: "The SOAP note is taking too long. Please try again.",
+  NO_SPEECH: "No speech was heard in the recording. Please record the consultation again.",
 };
 const UNKNOWN_FAILURE_MESSAGE = "The SOAP note could not be created. Please try again.";
 
@@ -114,6 +117,9 @@ export function ProcessingScreen() {
               failureMessage ??
               (current.failureReason ? FAILURE_MESSAGES[current.failureReason] : UNKNOWN_FAILURE_MESSAGE)
             }
+            noSpeech={current.failureReason === "NO_SPEECH"}
+            consultationId={current.consultationId}
+            clinicalPatientId={current.patient.clinicalPatientId}
             retrying={retry.isPending}
             retryError={retryError?.message ?? null}
             onRetry={() => retry.mutate()}
@@ -301,15 +307,50 @@ function Waiting({ since, liveStatus }: { since: number | null; liveStatus: Cons
 
 function Failed({
   message,
+  noSpeech,
+  consultationId,
+  clinicalPatientId,
   retrying,
   retryError,
   onRetry,
 }: {
   message: string;
+  noSpeech: boolean;
+  consultationId: number;
+  clinicalPatientId: number;
   retrying: boolean;
   retryError: string | null;
   onRetry: () => void;
 }) {
+  const start = useStartConsultation();
+
+  // Trying again would send the same silent audio, so a new recording for the same patient is offered.
+  if (noSpeech) {
+    return (
+      <Panel className="space-y-5 p-6 sm:p-8">
+        <Alert className="border-highlight/50 bg-peach text-peach-foreground">
+          <MicOff aria-hidden="true" />
+          <AlertTitle>No speech was heard</AlertTitle>
+          <AlertDescription className="text-peach-foreground">{message}</AlertDescription>
+        </Alert>
+        <ul className="list-disc space-y-1.5 pl-5 text-sm leading-relaxed text-muted-foreground">
+          <li>Record for at least a few seconds, and speak close to the microphone.</li>
+          <li>Check that the sound bars move while you speak.</li>
+          <li>Make sure the right microphone is chosen in the browser.</li>
+        </ul>
+        <Button size="lg" className="w-full" onClick={() => start.mutate(clinicalPatientId)} disabled={start.isPending}>
+          {start.isPending ? (
+            <Spinner className="size-5 text-current" label="Starting" />
+          ) : (
+            <Mic aria-hidden="true" data-icon="inline-start" />
+          )}
+          {start.isPending ? "Starting…" : "Record again"}
+        </Button>
+        <DeleteConsultation consultationId={consultationId} clinicalPatientId={clinicalPatientId} />
+      </Panel>
+    );
+  }
+
   return (
     <Panel className="space-y-5 p-6 sm:p-8">
       <Alert variant="destructive">
@@ -333,7 +374,58 @@ function Failed({
           {retryError}
         </p>
       )}
+      <DeleteConsultation consultationId={consultationId} clinicalPatientId={clinicalPatientId} />
     </Panel>
+  );
+}
+
+// Deletes the failed consultation with its audio and transcript, after asking once on the page.
+function DeleteConsultation({ consultationId, clinicalPatientId }: { consultationId: number; clinicalPatientId: number }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [asking, setAsking] = useState(false);
+
+  const remove = useMutation({
+    mutationFn: () => consultationsApi.discard(consultationId),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: consultationQueryKey(consultationId) });
+      void queryClient.invalidateQueries({ queryKey: patientSoapNotesQueryKey(clinicalPatientId) });
+      void queryClient.invalidateQueries({ queryKey: recentSoapNotesQueryKey });
+      toast.success("Consultation deleted");
+      router.replace(`/doctor/patients/${clinicalPatientId}`);
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "The consultation could not be deleted. Please try again."),
+  });
+
+  if (!asking) {
+    return (
+      <div className="flex justify-center border-t pt-4">
+        <Button variant="ghost" size="sm" onClick={() => setAsking(true)} className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+          <Trash aria-hidden="true" data-icon="inline-start" />
+          Delete this consultation
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div role="alertdialog" aria-labelledby="delete-title" aria-describedby="delete-text" className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+      <p id="delete-title" className="font-semibold">
+        Delete this consultation?
+      </p>
+      <p id="delete-text" className="mt-1 text-sm leading-relaxed text-muted-foreground">
+        Its audio and transcript are deleted and it leaves the patient&apos;s history. This cannot be undone.
+      </p>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <Button variant="outline" onClick={() => setAsking(false)} disabled={remove.isPending}>
+          Keep it
+        </Button>
+        <Button variant="destructive" onClick={() => remove.mutate()} disabled={remove.isPending}>
+          {remove.isPending ? <Spinner className="size-4 text-current" label="Deleting" /> : <Trash aria-hidden="true" data-icon="inline-start" />}
+          {remove.isPending ? "Deleting…" : "Delete"}
+        </Button>
+      </div>
+    </div>
   );
 }
 

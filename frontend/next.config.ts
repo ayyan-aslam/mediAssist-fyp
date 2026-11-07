@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {
+    // Don't offer automatic Next.js upgrades in `npm run dev`.
+    agentUpgrade: false,
     // The app areas render after the client-side auth guard has restored the session,
     // so only pages that opt in with `export const instant` are checked for instant navigation.
     instantInsights: { validationLevel: "manual-warning" },

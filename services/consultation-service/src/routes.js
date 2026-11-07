@@ -20,6 +20,7 @@ export function createRouter({ patientController, consultationController, soapNo
   router.post('/consultations/:consultationId/stop', consultationController.stop);
   router.post('/consultations/:consultationId/retry', consultationController.retry);
   router.get('/consultations/:consultationId', consultationController.getById);
+  router.delete('/consultations/:consultationId', consultationController.discard);
   router.get('/consultations/:consultationId/soap-note', soapNoteController.getSoapNote);
   router.patch('/consultations/:consultationId/soap-note', soapNoteController.updateSoapNote);
   router.post('/consultations/:consultationId/soap-note/finish-editing', soapNoteController.finishEditing);
