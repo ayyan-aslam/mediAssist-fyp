@@ -355,9 +355,13 @@ function formatDateTime(iso: string) {
 }
 
 // Like "SOAP note - Bilal Hussain - 2026-10-07.pdf". Characters that file names cannot hold are removed.
+// The date is the local one, like the date shown above the note (startedAt is in UTC).
 function pdfFileName(consultation: Consultation) {
   const name = consultation.patient.fullName.replace(/[\\/:*?"<>|]+/g, "").trim();
-  return `SOAP note - ${name} - ${consultation.startedAt.slice(0, 10)}.pdf`;
+  const started = new Date(consultation.startedAt);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const date = `${started.getFullYear()}-${pad(started.getMonth() + 1)}-${pad(started.getDate())}`;
+  return `SOAP note - ${name} - ${date}.pdf`;
 }
 
 function saveFile(file: Blob, fileName: string) {
