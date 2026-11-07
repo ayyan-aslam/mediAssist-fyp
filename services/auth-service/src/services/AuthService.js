@@ -1,4 +1,5 @@
 import { AppError } from '@mediassist/common';
+import { takenField } from '../repositories/UserRepository.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from './TokenService.js';
 
 // Field name from UserRepository.findDuplicates -> 409 error (design doc Section 5.2).
@@ -19,12 +20,13 @@ function accountSuspendedError() {
 
 // Sign-up, login, refresh and logout logic: design doc Sections 7.3 and 7.4.
 export class AuthService {
-  constructor({ userRepository, firebaseClient, cnicEncryptor, tokenService, refreshTokenService, logger }) {
+  constructor({ userRepository, firebaseClient, cnicEncryptor, tokenService, refreshTokenService, eventPublisher, logger }) {
     this.userRepository = userRepository;
     this.firebaseClient = firebaseClient;
     this.cnicEncryptor = cnicEncryptor;
     this.tokenService = tokenService;
     this.refreshTokenService = refreshTokenService;
+    this.eventPublisher = eventPublisher;
     this.logger = logger;
   }
 
@@ -54,16 +56,23 @@ export class AuthService {
     try {
       return await this.userRepository.createUserWithProfile({ firebaseUid, fullName, email, phone, role, profile });
     } catch (err) {
-      this.logger.error({ err }, 'Saving the new user failed. Deleting the Firebase user.');
+      // Another sign-up saved the same value at the same moment, after the check above.
+      const field = takenField(err);
+      if (field) this.logger.info({ field }, 'The value was registered at the same moment. Deleting the Firebase user.');
+      else this.logger.error({ err }, 'Saving the new user failed. Deleting the Firebase user.');
       // No half-made account is left: remove the Firebase user too.
       await this.firebaseClient.deleteUser(firebaseUid).catch((deleteErr) => {
         this.logger.error({ err: deleteErr, firebaseUid }, 'Deleting the Firebase user failed');
       });
+      if (field) {
+        const [code, message] = CONFLICT_ERRORS[field];
+        throw new AppError(409, code, message);
+      }
       throw new AppError(500, 'SIGNUP_FAILED', 'Your account could not be created. Please try again.');
     }
   }
 
-  async login(firebaseToken) {
+  async login(firebaseToken, ipAddress) {
     let identity;
     try {
       identity = await this.firebaseClient.verifyIdToken(firebaseToken);
@@ -84,7 +93,7 @@ export class AuthService {
     }
 
     const tokens = await this.#createSession(user);
-    // MAI-14: publish the audit.event "login" here.
+    this.#sendAuditEvent(user.userId, 'login', ipAddress);
     return {
       ...tokens,
       user: { userId: user.userId, fullName: user.fullName, email: user.email, role: user.role },
@@ -106,10 +115,19 @@ export class AuthService {
     };
   }
 
-  // Deletes only this device's refresh token.
-  async logout(refreshToken) {
+  // Deletes only this device's refresh token. userId comes from the gateway (logout is a protected route).
+  async logout(refreshToken, { userId, ipAddress }) {
     await this.refreshTokenService.revoke(refreshToken);
-    // MAI-14: publish the audit.event "logout" here.
+    if (userId) this.#sendAuditEvent(userId, 'logout', ipAddress);
+  }
+
+  // audit.event (design doc 6.4.12). Not awaited: login and logout must work even when RabbitMQ is down,
+  // so a failure is only logged.
+  #sendAuditEvent(userId, action, ipAddress) {
+    const data = { userId, action, details: null, ipAddress, occurredAt: new Date().toISOString() };
+    this.eventPublisher.publish('audit.event', data).catch((err) => {
+      this.logger.error({ err, userId, action }, 'Could not send the audit event');
+    });
   }
 
   #createAccessToken(user) {

@@ -5,21 +5,33 @@ function unauthorized(message) {
   return new AppError(401, 'UNAUTHORIZED', message);
 }
 
+function readBearerToken(req) {
+  const [scheme, token] = req.headers.authorization?.split(' ') ?? [];
+  return scheme === 'Bearer' && token ? token : null;
+}
+
 // Checks the access token (JWT, HS256) made by the Auth & User Service.
 // On success it sets req.user = { userId, role, name, email }.
 export class AuthMiddleware {
-  constructor({ jwtSecret, isPublicRoute }) {
+  constructor({ jwtSecret }) {
     this.key = new TextEncoder().encode(jwtSecret);
-    this.isPublicRoute = isPublicRoute;
   }
 
   authenticate = async (req, res, next) => {
-    if (this.isPublicRoute(req)) {
-      return next();
-    }
+    req.user = await this.verify(readBearerToken(req));
+    next();
+  };
 
-    const [scheme, token] = req.headers.authorization?.split(' ') ?? [];
-    if (scheme !== 'Bearer' || !token) {
+  // SSE streams only: a browser EventSource cannot send headers, so the token may come in ?token=
+  // (design doc Section 5.1.4).
+  authenticateSse = async (req, res, next) => {
+    const queryToken = typeof req.query.token === 'string' ? req.query.token : null;
+    req.user = await this.verify(readBearerToken(req) ?? queryToken);
+    next();
+  };
+
+  async verify(token) {
+    if (!token) {
       throw unauthorized('The access token is missing.');
     }
 
@@ -37,8 +49,6 @@ export class AuthMiddleware {
     if (!userId || !role) {
       throw unauthorized('The access token is not valid.');
     }
-
-    req.user = { userId, role, name, email };
-    next();
-  };
+    return { userId, role, name, email };
+  }
 }

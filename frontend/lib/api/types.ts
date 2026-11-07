@@ -2,8 +2,9 @@
 
 export type Role = "patient" | "doctor" | "admin";
 
+// Some errors carry extra fields, like `missingParts` of 409 PARTS_MISSING.
 export interface ApiErrorBody {
-  error: { code: string; message: string };
+  error: { code: string; message: string; [field: string]: unknown };
 }
 
 export interface Paged<T> {
@@ -53,3 +54,142 @@ export interface Specialty {
   specialtyId: number;
   name: string;
 }
+
+// GET /users/me for a doctor. The CNIC is never sent back.
+export interface DoctorProfile {
+  userId: number;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  role: "doctor";
+  registrationNo: string;
+  specialty: Specialty | null;
+}
+
+// PATCH /users/me for a doctor: only the fields that changed.
+export interface UpdateDoctorProfileRequest {
+  fullName?: string;
+  phone?: string;
+  specialtyId?: number | null;
+}
+
+// Consultation Service (design doc Section 5.5).
+
+export type Gender = "male" | "female" | "other";
+
+// The clinic patient object.
+export interface ClinicalPatient {
+  clinicalPatientId: number;
+  fullName: string;
+  phone: string;
+  email: string | null;
+  age: number;
+  gender: Gender;
+  createdAt: string;
+}
+
+// GET /clinical-patients?phone=
+export type FindClinicalPatientResponse =
+  | { found: true; patient: ClinicalPatient }
+  | { found: false; patient: null };
+
+export interface CreateClinicalPatientRequest {
+  fullName: string;
+  phone: string;
+  email: string | null;
+  age: number;
+  gender: Gender;
+}
+
+// PATCH /clinical-patients/{patientId}: only the fields that changed.
+export type UpdateClinicalPatientRequest = Partial<CreateClinicalPatientRequest>;
+
+// POST /consultations
+export interface StartConsultationResponse {
+  consultationId: number;
+  status: "recording";
+  startedAt: string;
+}
+
+export type ConsultationStatus = "recording" | "processing" | "completed" | "failed";
+
+export type FailureReason = "TRANSCRIPTION_FAILED" | "AI_FAILED" | "AI_TIMEOUT";
+
+// GET /consultations/{consultationId}
+export interface Consultation {
+  consultationId: number;
+  patient: { clinicalPatientId: number; fullName: string; phone: string };
+  status: ConsultationStatus;
+  failureReason: FailureReason | null;
+  followUpDate: string | null;
+  startedAt: string;
+  endedAt: string | null;
+}
+
+// POST /consultations/{consultationId}/audio-parts (201 new part, 200 already saved)
+export interface AudioPartResponse {
+  partNo: number;
+  saved: true;
+}
+
+// POST /consultations/{consultationId}/stop
+export interface StopConsultationResponse {
+  consultationId: number;
+  status: "processing";
+  endedAt: string;
+}
+
+// POST /consultations/{consultationId}/retry
+export interface RetryConsultationResponse {
+  consultationId: number;
+  status: "processing";
+}
+
+// GET /consultations/{consultationId}/soap-note
+export interface SoapNote {
+  soapNoteId: number;
+  consultationId: number;
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+  updatedAt: string;
+}
+
+export type SoapPart = "subjective" | "objective" | "assessment" | "plan";
+
+// PATCH /consultations/{consultationId}/soap-note: only the parts that changed.
+export type SoapNoteChanges = Partial<Record<SoapPart, string>>;
+
+export interface UpdateSoapNoteResponse {
+  updatedAt: string;
+}
+
+// POST /consultations/{consultationId}/soap-note/finish-editing
+export interface FinishEditingResponse {
+  changed: boolean;
+}
+
+// GET /clinical-patients/{patientId}/soap-notes: every consultation of the patient.
+// assessment is null while the consultation has no SOAP note.
+export interface PatientSoapNoteItem {
+  consultationId: number;
+  date: string;
+  status: ConsultationStatus;
+  assessment: string | null;
+}
+
+// GET /soap-notes and GET /soap-notes/search
+export interface SoapNoteListItem {
+  consultationId: number;
+  date: string;
+  patient: { clinicalPatientId: number; fullName: string; phone: string };
+}
+
+// GET /consultations/events (SSE): the data line of each event.
+export type ConsultationEvent =
+  | { event: "soap_ready"; data: { consultationId: number } }
+  | {
+      event: "consultation_failed";
+      data: { consultationId: number; failureReason: FailureReason; message: string };
+    };

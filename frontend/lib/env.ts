@@ -5,7 +5,8 @@ import { z } from "zod";
 // so each one is listed here by hand.
 const schema = z
   .object({
-    NEXT_PUBLIC_API_URL: z.url(),
+    // A full URL, or a path on this web app such as /api/v1 (passed on to the gateway by next.config.ts).
+    NEXT_PUBLIC_API_URL: z.union([z.url(), z.string().regex(/^\/[\w\-/]*$/, "must be a URL or a path like /api/v1")]),
     NEXT_PUBLIC_USE_MOCKS: z.enum(["true", "false"]).default("false"),
     NEXT_PUBLIC_FIREBASE_API_KEY: z.string().optional(),
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: z.string().optional(),

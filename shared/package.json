@@ -7,9 +7,11 @@
     ".": "./src/index.js"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "rabbitmq:setup": "node --env-file-if-exists=../.env scripts/setup-rabbitmq.js"
   },
   "dependencies": {
+    "amqplib": "^2.2.0",
     "pino": "^10.4.0",
     "zod": "^4.6.5"
   },

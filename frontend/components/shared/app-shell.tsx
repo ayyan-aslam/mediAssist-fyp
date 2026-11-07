@@ -36,7 +36,6 @@ export function AppShell({ area, children }: { area: Area; children: React.React
         </div>
         <div className="m-4 rounded-2xl bg-mint p-4 text-mint-foreground">
           <p className="text-sm font-bold">{AREA_LABEL[area]} module</p>
-          <p className="mt-1 text-xs leading-relaxed opacity-80">Patients, recording and SOAP notes arrive in the next release.</p>
         </div>
       </aside>
 
@@ -67,8 +66,12 @@ export function AppShell({ area, children }: { area: Area; children: React.React
 
           <p className="hidden items-center gap-2 lg:flex">
             <span className="text-muted-foreground">{AREA_LABEL[area]}</span>
-            <span className="text-muted-foreground/50">/</span>
-            <span className="font-semibold">{current?.label}</span>
+            {current && (
+              <>
+                <span className="text-muted-foreground/50">/</span>
+                <span className="font-semibold">{current.label}</span>
+              </>
+            )}
           </p>
 
           <div className="ml-auto flex items-center gap-1">

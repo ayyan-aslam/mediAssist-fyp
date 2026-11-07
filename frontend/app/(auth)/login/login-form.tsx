@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api/client";
 import { firebaseErrorMessage, firebaseSendVerificationEmail, isFirebaseError } from "@/lib/firebase";
+import { afterLoginHref } from "@/lib/redirect";
 
 const schema = z.object({
   email: z.string().trim().min(1, "Please enter your email.").pipe(z.email("Please enter a valid email address.")),
@@ -59,8 +60,7 @@ export function LoginForm() {
     try {
       const user = await login(email.trim(), password);
       // Go back to the page the guard sent the user away from, if it is in the user's own area.
-      const next = searchParams.get("next");
-      router.replace(next?.startsWith(`/${user.role}`) ? next : `/${user.role}`);
+      router.replace(afterLoginHref(searchParams.get("next"), user.role));
     } catch (err) {
       if (err instanceof ApiError && err.code === "EMAIL_NOT_VERIFIED") {
         setProblem({ kind: "unverified", email: email.trim() });

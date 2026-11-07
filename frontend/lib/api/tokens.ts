@@ -34,3 +34,15 @@ export function clearTokens() {
     // Nothing to remove.
   }
 }
+
+// When the access token expires, in milliseconds since 1970 (the JWT "exp" claim). null if unknown.
+export function getAccessTokenExpiry() {
+  if (!accessToken) return null;
+  try {
+    const part = accessToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const { exp } = JSON.parse(atob(part)) as { exp?: number };
+    return typeof exp === "number" ? exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}

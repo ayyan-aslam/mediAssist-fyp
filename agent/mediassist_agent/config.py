@@ -71,6 +71,9 @@ class Settings:
     # Fallback wrapper
     max_retries: int = field(default_factory=lambda: int(_env("AGENT_MAX_RETRIES", "2")))
 
+    # RabbitMQ mode (run.py --rabbitmq). The Consultation Service creates the exchange and queues.
+    rabbitmq_url: str | None = field(default_factory=lambda: _env("RABBITMQ_URL"))
+
     # Transcript inbox (temporary folder the agent picks transcripts up from)
     inbox_dir: Path = field(default_factory=lambda: _path("AGENT_INBOX_DIR", AGENT_DIR / "inbox"))
     outbox_dir: Path = field(default_factory=lambda: _path("AGENT_OUTBOX_DIR", AGENT_DIR / "outbox"))

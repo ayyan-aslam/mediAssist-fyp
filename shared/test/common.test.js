@@ -13,6 +13,9 @@ function createTestApp() {
   app.get('/conflict', () => {
     throw new AppError(409, 'ALREADY_ACTIVE', 'The account is already active.');
   });
+  app.get('/missing', () => {
+    throw new AppError(409, 'PARTS_MISSING', 'Some audio parts did not arrive.', { missingParts: [52, 53] });
+  });
   app.get('/crash', () => {
     throw new Error('database password is wrong');
   });
@@ -27,6 +30,14 @@ describe('errorHandler', () => {
     expect(res.body).toEqual({ error: { code: 'ALREADY_ACTIVE', message: 'The account is already active.' } });
   });
 
+  it('adds the extra fields of an AppError to the error object', async () => {
+    const res = await request(createTestApp()).get('/missing');
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({
+      error: { code: 'PARTS_MISSING', message: 'Some audio parts did not arrive.', missingParts: [52, 53] },
+    });
+  });
+
   it('returns 500 INTERNAL_ERROR without the details of an unknown error', async () => {
     const res = await request(createTestApp()).get('/crash');
     expect(res.status).toBe(500);
@@ -38,6 +49,14 @@ describe('errorHandler', () => {
     const res = await request(createTestApp()).post('/items').set('Content-Type', 'application/json').send('{bad');
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 400 VALIDATION_ERROR for a JSON body over the size limit', async () => {
+    const res = await request(createTestApp())
+      .post('/items')
+      .send({ name: 'x'.repeat(200 * 1024) });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: { code: 'VALIDATION_ERROR', message: 'The request body is too large.' } });
   });
 });
 

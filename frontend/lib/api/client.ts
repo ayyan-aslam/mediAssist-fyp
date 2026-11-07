@@ -1,15 +1,17 @@
 import { toast } from "sonner";
 import { env } from "@/lib/env";
 import { mockFetch } from "@/lib/api/mocks";
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "@/lib/api/tokens";
+import { clearTokens, getAccessToken, getAccessTokenExpiry, getRefreshToken, setTokens } from "@/lib/api/tokens";
 import type { ApiErrorBody, RefreshResponse } from "@/lib/api/types";
 
 // Error thrown by api() when the backend answers with the shared error shape (design doc 5.1.3).
+// `details` holds the extra fields some errors carry, like `missingParts` of PARTS_MISSING.
 export class ApiError extends Error {
   constructor(
     public status: number,
     public code: string,
     message: string,
+    public details: Record<string, unknown> = {},
   ) {
     super(message);
     this.name = "ApiError";
@@ -18,11 +20,16 @@ export class ApiError extends Error {
 
 export interface ApiOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+  // A FormData body is sent as multipart/form-data, anything else as JSON.
   body?: unknown;
   // false for public routes (sign-up, login, refresh): no token and no refresh on 401.
   auth?: boolean;
   // true when the caller shows the error itself, so no toast is shown.
   silent?: boolean;
+  // true for requests that must finish after the page is closed (fetch keepalive).
+  keepalive?: boolean;
+  // "blob" for file downloads (like a PDF). JSON otherwise.
+  responseType?: "json" | "blob";
 }
 
 const NETWORK_ERROR_MESSAGE = "Cannot reach the server. Check your internet connection and try again.";
@@ -37,23 +44,28 @@ export function setSessionExpiredHandler(handler: () => void) {
 
 function send(path: string, options: ApiOptions, token: string | null) {
   const headers: Record<string, string> = {};
-  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+  const isForm = options.body instanceof FormData;
+  // For FormData the browser sets the multipart Content-Type with its boundary.
+  if (options.body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const init: RequestInit = {
     method: options.method ?? "GET",
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: options.body === undefined ? undefined : isForm ? (options.body as FormData) : JSON.stringify(options.body),
+    keepalive: options.keepalive,
   };
   return env.useMocks ? mockFetch(path, init) : fetch(`${env.apiUrl}${path}`, init);
 }
 
 async function readError(res: Response) {
   const body = (await res.json().catch(() => null)) as ApiErrorBody | null;
+  const { code, message, ...details } = body?.error ?? ({} as Partial<ApiErrorBody["error"]>);
   return new ApiError(
     res.status,
-    body?.error?.code ?? "UNKNOWN_ERROR",
-    body?.error?.message ?? "Something went wrong. Please try again.",
+    code ?? "UNKNOWN_ERROR",
+    message ?? "Something went wrong. Please try again.",
+    details,
   );
 }
 
@@ -85,6 +97,17 @@ export function restoreSession() {
   return refreshOnce();
 }
 
+// For requests that cannot refresh on 401 themselves, like an EventSource (SSE).
+// Returns the access token, refreshed first when it expires within the margin (or when force is true).
+// Returns null when there is no session or the refresh failed; the caller tries again later.
+export async function freshAccessToken({ force = false, marginMs = 60_000 } = {}) {
+  const expiresAt = getAccessTokenExpiry();
+  const current = getAccessToken();
+  if (current && !force && expiresAt !== null && expiresAt - Date.now() > marginMs) return current;
+  const refreshed = await refreshOnce();
+  return refreshed ? getAccessToken() : null;
+}
+
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const useAuth = options.auth ?? true;
 
@@ -107,6 +130,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
 
     if (!res.ok) throw await readError(res);
     if (res.status === 204) return undefined as T;
+    if (options.responseType === "blob") return (await res.blob()) as T;
     return (await res.json()) as T;
   } catch (err) {
     const error =

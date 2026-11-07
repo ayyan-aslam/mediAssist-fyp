@@ -8,6 +8,7 @@ import { createRouter } from './routes.js';
 // No express.json() here: the gateway passes the request body to the service as it is.
 export function createApp({ config, logger }) {
   const app = express();
+  app.set('trust proxy', config.TRUST_PROXY_HOPS);
 
   app.use(helmet());
   app.use(cors({ origin: config.FRONTEND_URL }));

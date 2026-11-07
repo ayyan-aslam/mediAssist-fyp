@@ -1,22 +1,25 @@
 import { errorHandler } from '@mediassist/common';
 import express from 'express';
 import { AuthController } from './controllers/AuthController.js';
+import { ProfileController } from './controllers/ProfileController.js';
 import { SpecialtyController } from './controllers/SpecialtyController.js';
 import { createRouter } from './routes.js';
 import { AuthService } from './services/AuthService.js';
 import { CnicEncryptor } from './services/CnicEncryptor.js';
+import { ProfileService } from './services/ProfileService.js';
 import { RefreshTokenService } from './services/RefreshTokenService.js';
 import { SpecialtyService } from './services/SpecialtyService.js';
 import { TokenService } from './services/TokenService.js';
 import { RequestValidator } from './validators/RequestValidator.js';
 
-// Repositories and the Firebase client are passed in, so tests can replace them.
+// Repositories, the Firebase client and the EventPublisher are passed in, so tests can replace them.
 export function createApp({
   logger,
   config,
   userRepository,
   refreshTokenRepository,
   specialtyRepository,
+  eventPublisher,
   firebaseClient,
 }) {
   const authService = new AuthService({
@@ -25,9 +28,15 @@ export function createApp({
     cnicEncryptor: new CnicEncryptor({ encryptionKey: config.CNIC_ENCRYPTION_KEY, hashKey: config.CNIC_HASH_KEY }),
     tokenService: new TokenService(config.JWT_SECRET),
     refreshTokenService: new RefreshTokenService(refreshTokenRepository),
+    eventPublisher,
     logger,
   });
-  const authController = new AuthController({ requestValidator: new RequestValidator(), authService });
+  const requestValidator = new RequestValidator();
+  const authController = new AuthController({ requestValidator, authService });
+  const profileController = new ProfileController({
+    requestValidator,
+    profileService: new ProfileService({ userRepository, specialtyRepository }),
+  });
   const specialtyController = new SpecialtyController({
     specialtyService: new SpecialtyService(specialtyRepository),
   });
@@ -38,7 +47,7 @@ export function createApp({
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
   });
-  app.use(createRouter({ authController, specialtyController }));
+  app.use(createRouter({ authController, profileController, specialtyController }));
 
   app.use(errorHandler(logger));
   return app;

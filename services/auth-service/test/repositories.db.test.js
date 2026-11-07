@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPrismaClient } from '../src/db/prisma.js';
 import { RefreshTokenRepository } from '../src/repositories/RefreshTokenRepository.js';
 import { SpecialtyRepository } from '../src/repositories/SpecialtyRepository.js';
-import { UserRepository } from '../src/repositories/UserRepository.js';
+import { takenField, UserRepository } from '../src/repositories/UserRepository.js';
 
 try {
   process.loadEnvFile(fileURLToPath(new URL('../../../.env', import.meta.url)));
@@ -89,6 +89,56 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
 
     await tokens.deleteByHash(newHash);
     expect(await tokens.findByHash(newHash)).toBeNull();
+  });
+
+  it('updates and reads a doctor profile without the CNIC', async () => {
+    const doctor = newDoctor('e');
+    const userId = await users.createUserWithProfile(doctor);
+    const [specialty] = await new SpecialtyRepository(prisma).findAll();
+    const phone = `0${crypto.randomInt(1e9, 1e10)}`;
+
+    await users.updateProfile(userId, 'doctor', {
+      fullName: 'Dr. Updated',
+      phone,
+      profile: { specialtyId: specialty.specialtyId },
+    });
+
+    expect(await users.findProfileById(userId)).toEqual({
+      userId,
+      fullName: 'Dr. Updated',
+      email: doctor.email,
+      phone,
+      role: 'doctor',
+      patientProfile: null,
+      doctorProfile: { registrationNo: doctor.profile.registrationNo, specialty },
+    });
+    expect(await users.findByPhone(phone)).toMatchObject({ userId });
+    expect(await new SpecialtyRepository(prisma).findById(specialty.specialtyId)).toEqual(specialty);
+  });
+
+  it('names the field when two users save the same phone at the same moment', async () => {
+    const first = await users.createUserWithProfile(newDoctor('f'));
+    const second = await users.createUserWithProfile(newDoctor('g'));
+    const phone = `0${crypto.randomInt(1e9, 1e10)}`;
+    const save = (userId) => users.updateProfile(userId, 'doctor', { phone, profile: {} });
+
+    const results = await Promise.allSettled([save(first), save(second)]);
+
+    const failed = results.filter((result) => result.status === 'rejected');
+    expect(failed).toHaveLength(1);
+    expect(takenField(failed[0].reason)).toBe('phone');
+  });
+
+  it('names the field when two doctors sign up with the same registration number at the same moment', async () => {
+    const first = newDoctor('h');
+    const second = { ...newDoctor('i'), profile: { ...newDoctor('i').profile, registrationNo: first.profile.registrationNo } };
+
+    const results = await Promise.allSettled([users.createUserWithProfile(first), users.createUserWithProfile(second)]);
+
+    const failed = results.filter((result) => result.status === 'rejected');
+    expect(failed).toHaveLength(1);
+    expect(takenField(failed[0].reason)).toBe('registrationNo');
+    expect(takenField(new Error('connection lost'))).toBeNull();
   });
 
   it('lists the specialities', async () => {

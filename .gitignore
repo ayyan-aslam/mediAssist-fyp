@@ -16,7 +16,6 @@ node_modules/
 .venv/
 venv/
 __pycache__/
-*.pyc
 
 # Build output
 generated/
@@ -43,3 +42,14 @@ AGENTS.md
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# AI Pipeline (agent/): patient data and Python caches
+agent/.venv/
+agent/inbox/*/*
+!agent/inbox/*/.gitkeep
+agent/outbox/*.json
+.pytest_cache/
+*.py[cod]
+
+# Generated test audio (TTS consultations for transcription tests)
+test-audio/

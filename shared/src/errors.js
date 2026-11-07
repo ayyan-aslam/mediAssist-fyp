@@ -1,16 +1,18 @@
 // Error format and HTTP statuses: design doc Section 5.1.3.
 
+// details: extra fields for the error object, for example { missingParts: [52, 53] } (design doc 5.5).
 export class AppError extends Error {
-  constructor(status, code, message) {
+  constructor(status, code, message, details = {}) {
     super(message);
     this.name = 'AppError';
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
-function sendError(res, status, code, message) {
-  res.status(status).json({ error: { code, message } });
+function sendError(res, status, code, message, details = {}) {
+  res.status(status).json({ error: { code, message, ...details } });
 }
 
 // Must be the last middleware of the app.
@@ -22,12 +24,16 @@ export function errorHandler(logger) {
     }
 
     if (err instanceof AppError) {
-      return sendError(res, err.status, err.code, err.message);
+      return sendError(res, err.status, err.code, err.message, err.details);
     }
 
     // Invalid JSON body, rejected by express.json().
     if (err.type === 'entity.parse.failed') {
       return sendError(res, 400, 'VALIDATION_ERROR', 'The request body is not valid JSON.');
+    }
+    // A JSON body over the limit of express.json().
+    if (err.type === 'entity.too.large') {
+      return sendError(res, 400, 'VALIDATION_ERROR', 'The request body is too large.');
     }
 
     logger.error({ err, method: req.method, url: req.originalUrl }, 'Unhandled error');

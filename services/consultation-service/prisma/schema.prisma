@@ -1,0 +1,97 @@
+// ConsultationDB tables: design doc Section 4.4.4.
+// Check constraints (Section 4.6) are added as raw SQL in the migration, because Prisma cannot model them.
+// The indexes (Section 4.9) are listed here too, so later migrations do not drop them.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ClinicalPatient {
+  clinicalPatientId Int      @id @default(autoincrement()) @map("clinical_patient_id")
+  // Logical reference to USERS in UserDB.
+  doctorId          Int      @map("doctor_id")
+  fullName          String   @map("full_name") @db.VarChar(100)
+  phone             String   @db.VarChar(15)
+  email             String?  @db.VarChar(150)
+  age               Int      @db.SmallInt
+  gender            String   @db.VarChar(10)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  consultations Consultation[]
+
+  @@unique([doctorId, phone], map: "clinical_patient_doctor_id_phone_key")
+  @@index([fullName(ops: raw("gin_trgm_ops"))], type: Gin, map: "clinical_patient_full_name_trgm_idx")
+  @@index([phone(ops: raw("gin_trgm_ops"))], type: Gin, map: "clinical_patient_phone_trgm_idx")
+  @@map("clinical_patient")
+}
+
+model Consultation {
+  consultationId    Int       @id @default(autoincrement()) @map("consultation_id")
+  clinicalPatientId Int       @map("clinical_patient_id")
+  status            String    @db.VarChar(12)
+  soapAttempt       Int       @default(1) @map("soap_attempt") @db.SmallInt
+  aiRequestedAt     DateTime? @map("ai_requested_at") @db.Timestamp(6)
+  failureReason     String?   @map("failure_reason") @db.VarChar(30)
+  followUpDate      DateTime? @map("follow_up_date") @db.Date
+  startedAt         DateTime  @map("started_at") @db.Timestamp(6)
+  endedAt           DateTime? @map("ended_at") @db.Timestamp(6)
+
+  clinicalPatient   ClinicalPatient    @relation(fields: [clinicalPatientId], references: [clinicalPatientId])
+  audioParts        AudioPart[]
+  transcriptWindows TranscriptWindow[]
+  soapNote          SoapNote?
+
+  @@index([clinicalPatientId, startedAt], map: "consultation_clinical_patient_id_started_at_idx")
+  @@map("consultation")
+}
+
+model AudioPart {
+  audioPartId    Int      @id @default(autoincrement()) @map("audio_part_id")
+  consultationId Int      @map("consultation_id")
+  partNo         Int      @map("part_no") @db.SmallInt
+  fileKey        String   @unique @map("file_key") @db.VarChar(255)
+  durationSec    Int      @map("duration_sec")
+  recordedAt     DateTime @map("recorded_at") @db.Timestamp(6)
+
+  consultation Consultation @relation(fields: [consultationId], references: [consultationId], onDelete: Cascade)
+
+  @@unique([consultationId, partNo], map: "audio_part_consultation_id_part_no_key")
+  @@map("audio_part")
+}
+
+model TranscriptWindow {
+  windowId       Int      @id @default(autoincrement()) @map("window_id")
+  consultationId Int      @map("consultation_id")
+  windowNo       Int      @map("window_no") @db.SmallInt
+  transcriptText String?  @map("transcript_text")
+  status         String   @db.VarChar(10)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  consultation Consultation @relation(fields: [consultationId], references: [consultationId], onDelete: Cascade)
+
+  @@unique([consultationId, windowNo], map: "transcript_window_consultation_id_window_no_key")
+  @@map("transcript_window")
+}
+
+model SoapNote {
+  soapNoteId     Int      @id @default(autoincrement()) @map("soap_note_id")
+  consultationId Int      @unique @map("consultation_id")
+  subjective     String?
+  objective      String?
+  assessment     String?
+  plan           String?
+  // The AI Pipeline's full result (aiResult in soap.generated), saved as it is.
+  // Never read or changed by the doctor's edits. Phase 2 builds the draft prescription from it.
+  aiResult       Json?    @map("ai_result") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  consultation Consultation @relation(fields: [consultationId], references: [consultationId], onDelete: Cascade)
+
+  @@map("soap_note")
+}

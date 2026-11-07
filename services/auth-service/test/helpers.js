@@ -19,11 +19,24 @@ export const validDoctor = {
   confirmPassword: 'Secret@123',
 };
 
+// The Prisma error for a value that a unique index refused (shape from @prisma/adapter-pg).
+export function uniqueViolation(index) {
+  return Object.assign(new Error('Unique constraint failed'), {
+    code: 'P2002',
+    meta: { driverAdapterError: { cause: { kind: 'UniqueConstraintViolation', constraint: { index } } } },
+  });
+}
+
 // In-memory copies of the repositories, so the tests do not need a database.
 function createFakeRepositories() {
   const users = [];
   const doctorProfiles = [];
+  const patientProfiles = [];
   const refreshTokens = [];
+  const specialties = [
+    { specialtyId: 1, name: 'General Physician' },
+    { specialtyId: 3, name: 'Cardiologist' },
+  ];
   let nextTokenId = 1;
 
   const userRepository = {
@@ -49,6 +62,43 @@ function createFakeRepositories() {
     async findById(userId) {
       return users.find((user) => user.userId === userId) ?? null;
     },
+    async findByPhone(phone) {
+      return users.find((user) => user.phone === phone) ?? null;
+    },
+    async findProfileById(userId) {
+      const user = users.find((item) => item.userId === userId);
+      if (!user) return null;
+      const doctor = doctorProfiles.find((item) => item.userId === userId);
+      const patient = patientProfiles.find((item) => item.userId === userId);
+      return {
+        userId: user.userId,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        patientProfile: patient ? { dateOfBirth: patient.dateOfBirth ?? null, gender: patient.gender ?? null } : null,
+        doctorProfile: doctor
+          ? {
+              registrationNo: doctor.registrationNo,
+              specialty: specialties.find((item) => item.specialtyId === doctor.specialtyId) ?? null,
+            }
+          : null,
+      };
+    },
+    updateProfile: vi.fn(async (userId, role, { fullName, phone, profile }) => {
+      const user = users.find((item) => item.userId === userId);
+      if (fullName !== undefined) user.fullName = fullName;
+      if (phone !== undefined) user.phone = phone;
+      const profiles = role === 'doctor' ? doctorProfiles : patientProfiles;
+      let row = profiles.find((item) => item.userId === userId);
+      if (!row) {
+        row = { userId };
+        profiles.push(row);
+      }
+      for (const [key, value] of Object.entries(profile)) {
+        if (value !== undefined) row[key] = value;
+      }
+    }),
   };
 
   const refreshTokenRepository = {
@@ -73,14 +123,14 @@ function createFakeRepositories() {
 
   const specialtyRepository = {
     async findAll() {
-      return [
-        { specialtyId: 1, name: 'General Physician' },
-        { specialtyId: 3, name: 'Cardiologist' },
-      ];
+      return specialties;
+    },
+    async findById(specialtyId) {
+      return specialties.find((item) => item.specialtyId === specialtyId) ?? null;
     },
   };
 
-  return { users, doctorProfiles, refreshTokens, userRepository, refreshTokenRepository, specialtyRepository };
+  return { users, doctorProfiles, patientProfiles, refreshTokens, userRepository, refreshTokenRepository, specialtyRepository };
 }
 
 function createFirebaseMock() {
@@ -97,13 +147,15 @@ function createFirebaseMock() {
 export function createTestContext() {
   const fakes = createFakeRepositories();
   const firebaseClient = createFirebaseMock();
+  const eventPublisher = { publish: vi.fn(async () => {}) };
   const app = createApp({
     logger: createLogger('test', 'silent'),
     config: testConfig,
     userRepository: fakes.userRepository,
     refreshTokenRepository: fakes.refreshTokenRepository,
     specialtyRepository: fakes.specialtyRepository,
+    eventPublisher,
     firebaseClient,
   });
-  return { app, firebaseClient, ...fakes };
+  return { app, firebaseClient, eventPublisher, ...fakes };
 }

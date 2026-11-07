@@ -19,6 +19,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32, 'must be at least 32 characters'),
   CNIC_ENCRYPTION_KEY: base64Key32,
   CNIC_HASH_KEY: base64Key32,
+  RABBITMQ_URL: z.url({ protocol: /^amqps?$/ }),
   FIREBASE_PROJECT_ID: z.string().min(1),
   FIREBASE_SERVICE_ACCOUNT_PATH: z
     .string()
