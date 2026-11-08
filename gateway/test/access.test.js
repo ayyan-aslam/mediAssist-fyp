@@ -83,6 +83,30 @@ describe('role check', () => {
   }
 });
 
+describe('follow-up and internal routes', () => {
+  it('forwards PUT /consultations/{id}/follow-up with the body and the doctor name and email', async () => {
+    const app = buildApp(services);
+    const res = await request(app)
+      .put('/api/v1/consultations/41/follow-up')
+      .set('Authorization', await bearer(doctor))
+      .send({ followUpDate: '2026-10-21' });
+    expect(res.status).toBe(200);
+    expect(res.body.url).toBe('/consultations/41/follow-up');
+    expect(res.body.body).toEqual({ followUpDate: '2026-10-21' });
+    expect(decodeURIComponent(res.body.headers['x-user-name'])).toBe('Dr. Sara Ahmed');
+    expect(res.body.headers['x-user-email']).toBe('sara@example.com');
+  });
+
+  it('does not expose the internal prescription-source route', async () => {
+    const app = buildApp(services);
+    const res = await request(app)
+      .get('/api/v1/internal/consultations/41/prescription-source?doctorId=16')
+      .set('Authorization', await bearer(doctor));
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('ROUTE_NOT_FOUND');
+  });
+});
+
 describe('token in the query string', () => {
   it('accepts ?token= on an SSE route and removes it before forwarding', async () => {
     const app = buildApp(services);

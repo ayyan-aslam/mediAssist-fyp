@@ -106,6 +106,17 @@ export class ConsultationRepository {
     });
   }
 
+  // Saves the follow-up date (null removes it). Returns the patient's name and email for followup.changed,
+  // or null when the consultation does not exist or belongs to another doctor.
+  async updateFollowUp(consultationId, doctorId, followUpDate) {
+    const rows = await this.prisma.consultation.updateManyAndReturn({
+      where: { consultationId, clinicalPatient: { doctorId } },
+      data: { followUpDate },
+      select: { clinicalPatient: { select: { fullName: true, email: true } } },
+    });
+    return rows[0]?.clinicalPatient ?? null;
+  }
+
   // Internal use only (Prescription Service): no doctor check.
   findPatientContact(consultationId) {
     return this.prisma.consultation.findUnique({

@@ -25,8 +25,10 @@ export function createRouter({ patientController, consultationController, soapNo
   router.patch('/consultations/:consultationId/soap-note', soapNoteController.updateSoapNote);
   router.post('/consultations/:consultationId/soap-note/finish-editing', soapNoteController.finishEditing);
   router.get('/consultations/:consultationId/soap-note/pdf', soapNoteController.downloadPdf);
+  router.put('/consultations/:consultationId/follow-up', consultationController.setFollowUp);
 
   router.get('/internal/consultations/:consultationId/patient-contact', consultationController.getPatientContact);
+  router.get('/internal/consultations/:consultationId/prescription-source', soapNoteController.getPrescriptionSource);
 
   return router;
 }

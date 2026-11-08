@@ -196,7 +196,7 @@ describe('SoapNoteService', () => {
   });
 
   describe('saveGenerated (soap.generated)', () => {
-    it('saves the note and aiResult as they are, sets completed, sends soap.ready and tells the doctor', async () => {
+    it('saves the note and aiResult as they are, sets completed and tells the doctor', async () => {
       await ctx.service.saveGenerated(generated());
 
       expect(ctx.soapNoteRepository.saveSoapNote).toHaveBeenCalledWith(CONSULTATION_ID, 1, {
@@ -208,14 +208,8 @@ describe('SoapNoteService', () => {
       });
       expect(ctx.notes[0].aiResult).toBe(AI_RESULT);
       expect(ctx.consultation.status).toBe('completed');
-      expect(ctx.eventPublisher.publish).toHaveBeenCalledExactlyOnceWith('soap.ready', {
-        consultationId: CONSULTATION_ID,
-        soapNoteId: 39,
-        doctorId: DOCTOR_ID,
-        clinicalPatientId: 7,
-        patientAge: 45,
-        plan: 'Panadol 500 mg, 1 tablet, twice a day, 3 days\nWarm salt water gargles.',
-      });
+      // soap.ready was removed (design doc 6.4.6): nothing is sent to RabbitMQ.
+      expect(ctx.eventPublisher.publish).not.toHaveBeenCalled();
       expect(ctx.notifyDoctor).toHaveBeenCalledWith(DOCTOR_ID, 'soap_ready', { consultationId: CONSULTATION_ID });
     });
 
@@ -248,7 +242,6 @@ describe('SoapNoteService', () => {
 
       expect(ctx.notes).toHaveLength(1);
       expect(ctx.notes[0].plan).not.toBe('Another plan');
-      expect(ctx.eventPublisher.publish).toHaveBeenCalledTimes(1);
       expect(ctx.notifyDoctor).toHaveBeenCalledTimes(1);
     });
 
@@ -263,13 +256,6 @@ describe('SoapNoteService', () => {
       await ctx.service.saveGenerated(generated());
       expect(ctx.eventPublisher.publish).not.toHaveBeenCalled();
       expect(ctx.notifyDoctor).not.toHaveBeenCalled();
-    });
-
-    it('still tells the doctor when soap.ready cannot be sent', async () => {
-      ctx.eventPublisher.publish.mockRejectedValueOnce(new Error('RabbitMQ is not connected.'));
-      await ctx.service.saveGenerated(generated());
-      expect(ctx.notes).toHaveLength(1);
-      expect(ctx.notifyDoctor).toHaveBeenCalledWith(DOCTOR_ID, 'soap_ready', { consultationId: CONSULTATION_ID });
     });
   });
 

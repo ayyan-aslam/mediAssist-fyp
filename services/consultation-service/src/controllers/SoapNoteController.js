@@ -3,11 +3,18 @@ import { clientIp, currentDoctorId, currentDoctorName } from './currentDoctor.js
 
 // SOAP note endpoints: design doc Section 5.5 and Diagram 12.
 export class SoapNoteController {
-  constructor({ requestValidator, soapNoteEditService, soapNoteHistoryService, soapNotePdfService }) {
+  constructor({
+    requestValidator,
+    soapNoteEditService,
+    soapNoteHistoryService,
+    soapNotePdfService,
+    prescriptionSourceService,
+  }) {
     this.requestValidator = requestValidator;
     this.soapNoteEditService = soapNoteEditService;
     this.soapNoteHistoryService = soapNoteHistoryService;
     this.soapNotePdfService = soapNotePdfService;
+    this.prescriptionSourceService = prescriptionSourceService;
   }
 
   // Opening the note starts the editing session.
@@ -41,6 +48,14 @@ export class SoapNoteController {
       .set('Content-Disposition', `attachment; filename="soap-note-${consultationId}.pdf"`)
       .set('Cache-Control', 'no-store')
       .send(pdf);
+  };
+
+  // Internal (Prescription Service). The gateway does not expose /internal routes, so the doctor comes
+  // from the query: the Prescription Service sends the doctor who is finalizing.
+  getPrescriptionSource = async (req, res) => {
+    const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);
+    const { doctorId } = this.requestValidator.validatePrescriptionSource(req.query);
+    res.json(await this.prescriptionSourceService.getPrescriptionSource(consultationId, doctorId));
   };
 
   listForPatient = async (req, res) => {

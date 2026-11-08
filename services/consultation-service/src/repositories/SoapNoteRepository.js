@@ -123,6 +123,18 @@ export class SoapNoteRepository {
     });
   }
 
+  // For the Prescription Service: the patient and the note's plan, AI result and edited prescription.
+  // Same null / { soapNote: null } rule as above.
+  findPrescriptionSource(consultationId, doctorId) {
+    return this.prisma.consultation.findFirst({
+      where: { consultationId, clinicalPatient: { doctorId } },
+      select: {
+        clinicalPatient: { select: { fullName: true, age: true, gender: true, phone: true, email: true } },
+        soapNote: { select: { plan: true, aiResult: true, prescription: true } },
+      },
+    });
+  }
+
   // Saves only the sent parts. Returns the new updated_at, or null when there is no note of this doctor.
   // A null prescription or symptoms list is saved as SQL NULL (back to the AI version).
   async update(consultationId, doctorId, changes) {

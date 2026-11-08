@@ -84,27 +84,29 @@ describe('setupTopology', () => {
 
     expect(channel.assertExchange).toHaveBeenCalledWith('mediassist.events', 'direct', { durable: true });
     expect(channel.assertQueue).toHaveBeenCalledTimes(QUEUES.length * 3);
-    expect(channel.assertQueue).toHaveBeenCalledWith('prescription.soap.ready', {
+    expect(channel.assertQueue).toHaveBeenCalledWith('notification.followup.changed', {
       durable: true,
-      arguments: { 'x-dead-letter-exchange': '', 'x-dead-letter-routing-key': 'prescription.soap.ready.retry' },
+      arguments: { 'x-dead-letter-exchange': '', 'x-dead-letter-routing-key': 'notification.followup.changed.retry' },
     });
-    expect(channel.assertQueue).toHaveBeenCalledWith('prescription.soap.ready.retry', {
+    expect(channel.assertQueue).toHaveBeenCalledWith('notification.followup.changed.retry', {
       durable: true,
       arguments: {
         'x-message-ttl': 10000,
         'x-dead-letter-exchange': '',
-        'x-dead-letter-routing-key': 'prescription.soap.ready',
+        'x-dead-letter-routing-key': 'notification.followup.changed',
       },
     });
-    expect(channel.assertQueue).toHaveBeenCalledWith('prescription.soap.ready.dlq', { durable: true });
+    expect(channel.assertQueue).toHaveBeenCalledWith('notification.followup.changed.dlq', { durable: true });
     expect(channel.bindQueue).toHaveBeenCalledWith('gateway.user.status', EXCHANGE, 'user.suspended');
     expect(channel.bindQueue).toHaveBeenCalledWith('gateway.user.status', EXCHANGE, 'user.activated');
     expect(channel.bindQueue).toHaveBeenCalledWith('audit.audit.event', EXCHANGE, 'audit.event');
     expect(channel.close).toHaveBeenCalled();
   });
 
-  it('has the 11 queues of design doc 6.2.2, and each name ends with its first routing key', () => {
-    expect(QUEUES).toHaveLength(11);
+  it('has the 10 queues of design doc 6.2.2, and each name ends with its first routing key', () => {
+    expect(QUEUES).toHaveLength(10);
+    // soap.ready was removed (design doc 6.4.6).
+    expect(QUEUES.some(({ routingKeys }) => routingKeys.includes('soap.ready'))).toBe(false);
     for (const { name, routingKeys } of QUEUES.filter((queue) => queue.name !== 'gateway.user.status')) {
       expect(name.endsWith(`.${routingKeys[0]}`)).toBe(true);
     }
@@ -194,7 +196,7 @@ describe('EventPublisher', () => {
     const { channel } = await connect();
     const publisher = new EventPublisher({ connection, source: 'consultation-service', logger: fakeLogger() });
 
-    await publisher.publish('soap.ready', { note: 'مریض کو بخار ہے' });
+    await publisher.publish('followup.changed', { note: 'مریض کو بخار ہے' });
     expect(JSON.parse(channel.publish.mock.calls[0][2].toString('utf8')).data.note).toBe('مریض کو بخار ہے');
   });
 
@@ -235,14 +237,14 @@ describe('EventPublisher', () => {
 });
 
 describe('EventConsumer', () => {
-  const queue = 'prescription.soap.ready';
-  const body = { messageId: 'a1b2', type: 'soap.ready', version: 1, source: 'consultation-service', data: { consultationId: 41 } };
+  const queue = 'notification.followup.changed';
+  const body = { messageId: 'a1b2', type: 'followup.changed', version: 1, source: 'consultation-service', data: { consultationId: 41 } };
 
   function delivery({ content = JSON.stringify(body), failures = 0 } = {}) {
     const deaths = failures ? [{ queue, reason: 'rejected', count: failures }, { queue: `${queue}.retry`, reason: 'expired', count: failures }] : undefined;
     return {
       content: Buffer.from(content, 'utf8'),
-      properties: { messageId: 'a1b2', type: 'soap.ready', contentType: 'application/json', headers: deaths ? { 'x-death': deaths } : {} },
+      properties: { messageId: 'a1b2', type: 'followup.changed', contentType: 'application/json', headers: deaths ? { 'x-death': deaths } : {} },
     };
   }
 
@@ -286,7 +288,7 @@ describe('EventConsumer', () => {
     expect(channel.ack).not.toHaveBeenCalled();
     expect(channel.sendToQueue).not.toHaveBeenCalled();
     expect(logger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ messageId: 'a1b2', type: 'soap.ready', tries: failures + 1 }),
+      expect.objectContaining({ messageId: 'a1b2', type: 'followup.changed', tries: failures + 1 }),
       expect.any(String),
     );
   });
@@ -299,13 +301,13 @@ describe('EventConsumer', () => {
 
     await channel.onMessage(msg);
     const [target, content, options] = channel.sendToQueue.mock.calls[0];
-    expect(target).toBe('prescription.soap.ready.dlq');
+    expect(target).toBe('notification.followup.changed.dlq');
     expect(content).toBe(msg.content);
     expect(options).toMatchObject({ persistent: true, messageId: 'a1b2', headers: { 'last-error': 'database is down' } });
     expect(channel.ack).toHaveBeenCalledWith(msg);
     expect(channel.nack).not.toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalledWith(
-      expect.objectContaining({ messageId: 'a1b2', type: 'soap.ready', tries: 3 }),
+      expect.objectContaining({ messageId: 'a1b2', type: 'followup.changed', tries: 3 }),
       expect.any(String),
     );
   });
@@ -351,7 +353,7 @@ describe('EventConsumer', () => {
     await channel.onMessage(delivery({ content: '{not json' }));
     expect(handler).not.toHaveBeenCalled();
     expect(channel.nack).toHaveBeenCalled();
-    expect(logger.warn).toHaveBeenCalledWith(expect.objectContaining({ messageId: 'a1b2', type: 'soap.ready' }), expect.any(String));
+    expect(logger.warn).toHaveBeenCalledWith(expect.objectContaining({ messageId: 'a1b2', type: 'followup.changed' }), expect.any(String));
   });
 
   it('starts reading again after a reconnect', async () => {

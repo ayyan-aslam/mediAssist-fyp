@@ -7,6 +7,7 @@ import { createRouter } from './routes.js';
 import { ConsultationService } from './services/ConsultationService.js';
 import { PdfGenerator } from './services/PdfGenerator.js';
 import { PatientService } from './services/PatientService.js';
+import { PrescriptionSourceService } from './services/PrescriptionSourceService.js';
 import { SoapNoteEditService } from './services/SoapNoteEditService.js';
 import { SoapNoteHistoryService } from './services/SoapNoteHistoryService.js';
 import { SoapNotePdfService } from './services/SoapNotePdfService.js';
@@ -47,6 +48,7 @@ export function createApp({
     soapNoteEditService: new SoapNoteEditService({ soapNoteRepository, editSessionStore, eventPublisher, logger }),
     soapNoteHistoryService: new SoapNoteHistoryService({ soapNoteRepository, patientRepository }),
     soapNotePdfService: new SoapNotePdfService({ soapNoteRepository, pdfGenerator: new PdfGenerator() }),
+    prescriptionSourceService: new PrescriptionSourceService({ soapNoteRepository }),
   });
 
   const app = express();

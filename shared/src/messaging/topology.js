@@ -15,7 +15,6 @@ export const QUEUES = [
   { name: 'ai-pipeline.transcript.ready', routingKeys: ['transcript.ready'] },
   { name: 'consultation.soap.generated', routingKeys: ['soap.generated'] },
   { name: 'consultation.soap.generation.failed', routingKeys: ['soap.generation.failed'] },
-  { name: 'prescription.soap.ready', routingKeys: ['soap.ready'] },
   { name: 'notification.prescription.send', routingKeys: ['prescription.send'] },
   { name: 'prescription.delivery.result', routingKeys: ['delivery.result'] },
   { name: 'notification.followup.changed', routingKeys: ['followup.changed'] },

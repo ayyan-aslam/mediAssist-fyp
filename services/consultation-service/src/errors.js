@@ -21,5 +21,8 @@ export const notFailedError = () =>
 export const cannotDiscardError = () =>
   new AppError(409, 'CANNOT_DISCARD', 'Only a recording or a failed consultation can be deleted.');
 
+export const dateInPastError = () =>
+  new AppError(400, 'DATE_IN_PAST', 'The follow-up date cannot be in the past.');
+
 export const soapNotReadyError = () =>
   new AppError(409, 'SOAP_NOT_READY', 'The SOAP note is not ready yet.');

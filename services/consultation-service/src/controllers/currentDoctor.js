@@ -26,3 +26,8 @@ export function currentDoctorName(req) {
     return '';
   }
 }
+
+// The doctor's email from the access token.
+export function currentDoctorEmail(req) {
+  return req.get('x-user-email') ?? '';
+}

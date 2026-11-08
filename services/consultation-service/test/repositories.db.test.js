@@ -380,6 +380,38 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
     });
   });
 
+  it('saves and removes the follow-up date only for its doctor, and returns the patient name and email', async () => {
+    const { consultationId } = await newConsultation('completed');
+
+    expect(await consultations.updateFollowUp(consultationId, otherDoctorId, new Date('2026-10-21'))).toBeNull();
+    expect((await read(consultationId)).followUpDate).toBeNull();
+
+    expect(await consultations.updateFollowUp(consultationId, doctorId, new Date('2026-10-21'))).toEqual({
+      fullName: 'بلال حسین',
+      email: null,
+    });
+    expect((await read(consultationId)).followUpDate).toEqual(new Date('2026-10-21T00:00:00Z'));
+
+    await consultations.updateFollowUp(consultationId, doctorId, null);
+    expect((await read(consultationId)).followUpDate).toBeNull();
+  });
+
+  it('reads the prescription source only for its doctor', async () => {
+    const { consultationId } = await newConsultation('completed');
+    expect(await soapNotes.findPrescriptionSource(consultationId, otherDoctorId)).toBeNull();
+    expect((await soapNotes.findPrescriptionSource(consultationId, doctorId)).soapNote).toBeNull();
+
+    const prescription = [{ aiIndex: null, reviewIndex: null, name: 'Panadol', genericName: null, dose: null, frequency: null, duration: null, instructions: null }];
+    await prisma.soapNote.create({
+      data: { consultationId, subjective: 'S', objective: 'O', assessment: 'A', plan: 'P', aiResult: { a: 1 }, prescription },
+    });
+
+    expect(await soapNotes.findPrescriptionSource(consultationId, doctorId)).toEqual({
+      clinicalPatient: { fullName: 'بلال حسین', age: 45, gender: 'male', phone: expect.any(String), email: null },
+      soapNote: { plan: 'P', aiResult: { a: 1 }, prescription },
+    });
+  });
+
   it('lists a patient’s consultations newest first with the assessment, paged', async () => {
     const patient = await patients.insert(doctorId, newPatient('03000000014'));
     const ids = [];

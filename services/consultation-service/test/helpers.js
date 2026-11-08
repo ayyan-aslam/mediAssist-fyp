@@ -8,6 +8,8 @@ import { SseManager } from '../src/services/SseManager.js';
 export const DOCTOR_ID = 16;
 export const OTHER_DOCTOR_ID = 17;
 export const DOCTOR_IP = '39.45.12.8';
+export const DOCTOR_NAME = 'Dr. Sara Ahmed';
+export const DOCTOR_EMAIL = 'sara@example.com';
 
 export const validPatient = {
   fullName: 'Bilal Hussain',
@@ -89,6 +91,13 @@ function createFakeRepositories() {
       if (!row || patient.doctorId !== doctorId) return null;
       const { clinicalPatientId, fullName, phone } = patient;
       return { ...row, clinicalPatient: { clinicalPatientId, fullName, phone } };
+    },
+    async updateFollowUp(id, doctorId, followUpDate) {
+      const row = consultations.find((c) => c.consultationId === id);
+      const patient = row && patientOf(row);
+      if (!row || patient.doctorId !== doctorId) return null;
+      row.followUpDate = followUpDate;
+      return { fullName: patient.fullName, email: patient.email };
     },
     async findPatientContact(id) {
       const row = consultations.find((c) => c.consultationId === id);
@@ -195,6 +204,16 @@ function createFakeRepositories() {
         soapNote: noteOf(consultationId),
       };
     },
+    async findPrescriptionSource(consultationId, doctorId) {
+      const consultation = consultationOf(doctorId, consultationId);
+      if (!consultation) return null;
+      const { fullName, age, gender, phone, email } = patientOf(consultation);
+      const note = noteOf(consultationId);
+      return {
+        clinicalPatient: { fullName, age, gender, phone, email },
+        soapNote: note && { plan: note.plan, aiResult: note.aiResult ?? null, prescription: note.prescription ?? null },
+      };
+    },
     async update(consultationId, doctorId, changes) {
       const note = consultationOf(doctorId, consultationId) && noteOf(consultationId);
       if (!note) return null;
@@ -274,11 +293,18 @@ export function createTestContext() {
 
   // A request with the headers the API Gateway adds after it checks the token and the role.
   const as = (doctorId = DOCTOR_ID, role = 'doctor') => {
-    const send = (req) => req.set('x-user-id', String(doctorId)).set('x-user-role', role).set('x-user-ip', DOCTOR_IP);
+    const send = (req) =>
+      req
+        .set('x-user-id', String(doctorId))
+        .set('x-user-role', role)
+        .set('x-user-ip', DOCTOR_IP)
+        .set('x-user-name', encodeURIComponent(DOCTOR_NAME))
+        .set('x-user-email', DOCTOR_EMAIL);
     return {
       get: (url) => send(request(app).get(url)),
       post: (url) => send(request(app).post(url)),
       patch: (url) => send(request(app).patch(url)),
+      put: (url) => send(request(app).put(url)),
       delete: (url) => send(request(app).delete(url)),
     };
   };

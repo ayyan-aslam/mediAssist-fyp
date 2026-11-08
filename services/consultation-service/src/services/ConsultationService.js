@@ -1,6 +1,7 @@
 import {
   cannotDiscardError,
   consultationNotFoundError,
+  dateInPastError,
   notFailedError,
   notRecordingError,
   partsMissingError,
@@ -19,6 +20,9 @@ export const audioPartKey = (consultationId, partNo) => `consultations/${consult
 
 // The statuses a doctor can delete a consultation in.
 const DISCARDABLE = ['recording', 'failed'];
+
+// Today as YYYY-MM-DD in Pakistan time, where the clinics are (the reminders use it too, design doc 6.4.9).
+const todayInPakistan = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date());
 
 // Runs the recording logic (design doc Diagram 5). A doctor sees only the consultations of his own
 // patients: another doctor's consultation is reported as not found (404), never as forbidden.
@@ -175,6 +179,33 @@ export class ConsultationService {
       lastFullWindowNo: Math.floor(totalParts / PARTS_PER_WINDOW),
       endedAt: toIso(endedAt),
     });
+  }
+
+  // Sets, changes or removes (null) the follow-up date (design doc Diagram 10, Part 1), then sends
+  // followup.changed (6.4.9) so the Notification Service updates the reminders. Sending the same date
+  // again is safe: the reminders are created or updated, never added twice.
+  // doctor: { name, email } from the access token.
+  async setFollowUp(doctorId, consultationId, followUpDate, doctor) {
+    if (followUpDate !== null && followUpDate < todayInPakistan()) throw dateInPastError();
+
+    // A DATE column: the date at midnight UTC is saved as that day.
+    const date = followUpDate === null ? null : new Date(`${followUpDate}T00:00:00Z`);
+    const patient = await this.consultationRepository.updateFollowUp(consultationId, doctorId, date);
+    if (!patient) throw consultationNotFoundError();
+
+    // If this fails, the date is saved but the reminders are not updated. The error goes to the app,
+    // and saving the same date again sends the message again.
+    await this.eventPublisher.publish('followup.changed', {
+      consultationId,
+      followUpDate,
+      doctorId,
+      doctorName: doctor.name,
+      doctorEmail: doctor.email,
+      patientName: patient.fullName,
+      patientEmail: patient.email,
+      changedAt: new Date().toISOString(),
+    });
+    return { consultationId, followUpDate, patientReminder: followUpDate !== null && patient.email !== null };
   }
 
   // For the Prescription Service (GET /internal/consultations/{id}/patient-contact).

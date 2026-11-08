@@ -111,20 +111,6 @@ export class SoapNoteService {
     }
     this.logger.info({ consultationId, attempt, soapNoteId: note.soapNoteId }, 'Saved the SOAP note');
 
-    try {
-      await this.eventPublisher.publish('soap.ready', {
-        consultationId,
-        soapNoteId: note.soapNoteId,
-        doctorId: consultation.doctorId,
-        clinicalPatientId: consultation.clinicalPatientId,
-        patientAge: consultation.patientAge,
-        plan: note.plan,
-      });
-    } catch (err) {
-      // The note is saved and the doctor can use it. A repeated soap.generated would be ignored, so
-      // throwing here would not send it again either.
-      this.logger.error({ err, consultationId }, 'Could not send soap.ready');
-    }
     this.notifyDoctor(consultation.doctorId, 'soap_ready', { consultationId });
   }
 

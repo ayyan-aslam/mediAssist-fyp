@@ -1,5 +1,5 @@
 import { consultationNotFoundError } from '../errors.js';
-import { currentDoctorId } from './currentDoctor.js';
+import { currentDoctorEmail, currentDoctorId, currentDoctorName } from './currentDoctor.js';
 
 // Consultation endpoints: design doc Section 5.5.
 export class ConsultationController {
@@ -60,6 +60,14 @@ export class ConsultationController {
     const doctorId = currentDoctorId(req);
     const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);
     res.json(await this.consultationService.retry(doctorId, consultationId));
+  };
+
+  setFollowUp = async (req, res) => {
+    const doctorId = currentDoctorId(req);
+    const consultationId = this.requestValidator.parseId(req.params.consultationId, consultationNotFoundError);
+    const { followUpDate } = this.requestValidator.validateFollowUp(req.body);
+    const doctor = { name: currentDoctorName(req), email: currentDoctorEmail(req) };
+    res.json(await this.consultationService.setFollowUp(doctorId, consultationId, followUpDate, doctor));
   };
 
   // Internal (Prescription Service). The gateway does not expose /internal routes, so there is no user.

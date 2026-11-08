@@ -97,6 +97,12 @@ const soapNoteChangesSchema = z
   })
   .refine((changes) => Object.values(changes).some((value) => value !== undefined), 'send at least one part');
 
+// PUT follow-up: a date as YYYY-MM-DD, or null to remove it. The field must be sent.
+const followUpSchema = z.object({ followUpDate: z.iso.date().nullable() });
+
+// Internal prescription-source: the doctor the consultation must belong to.
+const prescriptionSourceSchema = z.object({ doctorId: z.coerce.number().int().positive().max(MAX_ID) });
+
 // Lists and pages (design doc 5.1.2). Query values arrive as strings.
 const pageSchema = {
   page: z.coerce.number().int().min(1).max(10_000).default(1),
@@ -149,6 +155,14 @@ export class RequestValidator {
   validateSoapNoteChanges(body) {
     const changes = parse(soapNoteChangesSchema, body);
     return Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined));
+  }
+
+  validateFollowUp(body) {
+    return parse(followUpSchema, body);
+  }
+
+  validatePrescriptionSource(query) {
+    return parse(prescriptionSourceSchema, query);
   }
 
   validateList(query) {
