@@ -291,3 +291,63 @@ export type ConsultationEvent =
       event: "consultation_failed";
       data: { consultationId: number; failureReason: FailureReason; message: string };
     };
+
+// PUT /consultations/{consultationId}/follow-up. patientReminder is false when the patient has no email.
+export interface FollowUpResponse {
+  consultationId: number;
+  followUpDate: string | null;
+  patientReminder: boolean;
+}
+
+// Prescription Service (design doc Section 5.7).
+
+export type PrescriptionItemSource = "doctor_prescribed" | "ai_accepted" | "doctor_added";
+
+export interface PrescriptionItem {
+  itemId: number;
+  position: number;
+  medicineName: string;
+  genericName: string | null;
+  dose: string | null;
+  frequency: string | null;
+  duration: string | null;
+  instructions: string | null;
+  source: PrescriptionItemSource;
+  referenceInfo: Record<string, unknown> | null;
+}
+
+// The prescription object.
+export interface Prescription {
+  prescriptionId: number;
+  consultationId: number;
+  status: "final";
+  patientName: string;
+  notes: string | null;
+  createdAt: string;
+  items: PrescriptionItem[];
+}
+
+// GET /prescriptions/{prescriptionId}/send-options. recipient is the masked email address.
+export interface SendOptions {
+  email: { available: boolean; recipient: string | null };
+  whatsapp: { available: boolean; reason: string };
+}
+
+// POST /prescriptions/{prescriptionId}/send
+export interface SendPrescriptionResponse {
+  sendId: number;
+  status: "sending";
+}
+
+export type DeliveryStatus = "sending" | "sent" | "failed";
+
+// GET /prescriptions/{prescriptionId}/deliveries: newest first, recipient masked.
+export interface Delivery {
+  sendId: number;
+  channel: "email";
+  recipient: string;
+  status: DeliveryStatus;
+  errorMessage: string | null;
+  requestedAt: string;
+  completedAt: string | null;
+}

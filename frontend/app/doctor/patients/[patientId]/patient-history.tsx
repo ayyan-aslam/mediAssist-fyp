@@ -1,9 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, CircleAlert, FileText, Mail, Mic, Phone, RotateCw, UserRoundSearch } from "lucide-react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarClock,
+  CircleAlert,
+  FileText,
+  Mail,
+  MailCheck,
+  Mic,
+  Pencil,
+  Phone,
+  RotateCw,
+  UserRoundSearch,
+} from "lucide-react";
+import { toast } from "sonner";
 import { ConsultationStatusChip, consultationHref } from "@/components/shared/consultation-status";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageTransition } from "@/components/shared/page-transition";
@@ -11,10 +26,13 @@ import { Spinner } from "@/components/shared/spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePrescription } from "@/hooks/use-prescription";
 import { useStartConsultation } from "@/hooks/use-start-consultation";
 import { ApiError } from "@/lib/api/client";
-import { consultationsApi, patientQueryKey, patientSoapNotesQueryKey } from "@/lib/api/consultations";
+import { consultationQueryKey, consultationsApi, patientQueryKey, patientSoapNotesQueryKey } from "@/lib/api/consultations";
+import { deliveriesQueryKey, prescriptionsApi } from "@/lib/api/prescriptions";
 import type { ClinicalPatient, PatientSoapNoteItem } from "@/lib/api/types";
+import { PatientForm, type PatientDetails } from "@/app/doctor/consultations/new/patient-form";
 import { firstLine, formatDate, GENDER_LABEL, initials } from "@/lib/format";
 
 const PAGE_SIZE = 10;
@@ -60,6 +78,7 @@ export function PatientHistory() {
     content = (
       <div className="space-y-8">
         {patient.data ? <PatientCard patient={patient.data} /> : <PatientCardSkeleton />}
+        {patient.data && <EditPatient patient={patient.data} />}
         <SoapNotes patientId={patientId} />
       </div>
     );
@@ -232,6 +251,7 @@ function NoteCard({ item }: { item: PatientSoapNoteItem }) {
         <p className="font-display text-lg font-bold tracking-tight">{formatDate(item.date)}</p>
         <ConsultationStatusChip status={item.status} />
       </div>
+      <NoteCardBadges item={item} />
       {assessment ? (
         <p dir="auto" className="line-clamp-2 leading-relaxed break-words">
           {assessment}
@@ -244,6 +264,101 @@ function NoteCard({ item }: { item: PatientSoapNoteItem }) {
         <ArrowRight aria-hidden="true" className="size-4 transition-transform group-hover:translate-x-0.5" />
       </p>
     </Link>
+  );
+}
+
+// The follow-up date and "Prescription sent", read from the consultation and its prescription.
+// Shown only when they load; a card never waits for them.
+function NoteCardBadges({ item }: { item: PatientSoapNoteItem }) {
+  const completed = item.status === "completed";
+  const consultation = useQuery({
+    queryKey: consultationQueryKey(item.consultationId),
+    queryFn: () => consultationsApi.get(item.consultationId),
+    enabled: completed,
+  });
+  const prescription = usePrescription(item.consultationId, { enabled: completed });
+  const prescriptionId = prescription.data?.prescriptionId;
+  const deliveries = useQuery({
+    queryKey: deliveriesQueryKey(prescriptionId ?? 0),
+    queryFn: () => prescriptionsApi.listDeliveries(prescriptionId!),
+    enabled: prescriptionId !== undefined,
+  });
+
+  const followUpDate = consultation.data?.followUpDate;
+  const sent = deliveries.data?.items.some((d) => d.status === "sent") ?? false;
+  if (!followUpDate && !sent) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {followUpDate && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-sky px-2 py-0.5 text-[11px] font-semibold text-sky-foreground">
+          <CalendarClock aria-hidden="true" className="size-3" />
+          Follow-up {formatDate(followUpDate)}
+        </span>
+      )}
+      {sent && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-secondary-foreground">
+          <MailCheck aria-hidden="true" className="size-3" />
+          Prescription sent
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Edit the patient's details. ?edit=1 opens it (from the SOAP note, to add an email); with
+// &note=<consultationId> the note opens again after saving.
+function EditPatient({ patient }: { patient: ClinicalPatient }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const note = searchParams.get("note");
+  const noteId = note && /^\d+$/.test(note) ? note : null;
+  const [editing, setEditing] = useState(() => searchParams.get("edit") === "1");
+
+  async function save(changes: Partial<PatientDetails>) {
+    if (Object.keys(changes).length > 0) {
+      const updated = await consultationsApi.updatePatient(patient.clinicalPatientId, changes);
+      queryClient.setQueryData(patientQueryKey(patient.clinicalPatientId), updated);
+      toast.success("The patient’s details are saved.");
+    }
+    setEditing(false);
+    if (noteId) router.push(`/doctor/consultations/${noteId}/note`);
+    else router.replace(`/doctor/patients/${patient.clinicalPatientId}`, { scroll: false });
+  }
+
+  if (!editing) {
+    return (
+      <div className="-mt-4 flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+          <Pencil aria-hidden="true" data-icon="inline-start" />
+          Edit details
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <section aria-labelledby="edit-patient-title" className="rounded-[1.5rem] border bg-card p-5 sm:p-8">
+      <h2 id="edit-patient-title" className="font-display text-xl font-bold tracking-tight">
+        Edit the patient’s details
+      </h2>
+      <p className="mt-1 mb-5 text-sm text-muted-foreground">
+        {noteId
+          ? "Add the patient’s email to send the prescription. The SOAP note opens again after you save."
+          : "Change only what is wrong. The phone number cannot be changed here."}
+      </p>
+      <PatientForm
+        patient={patient}
+        submitLabel={noteId ? "Save and go back to the note" : "Save details"}
+        busyLabel="Saving…"
+        onSubmit={save}
+        onCancel={() => {
+          setEditing(false);
+          if (noteId) router.push(`/doctor/consultations/${noteId}/note`);
+        }}
+      />
+    </section>
   );
 }
 

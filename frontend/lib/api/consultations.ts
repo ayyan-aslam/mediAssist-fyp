@@ -6,6 +6,7 @@ import type {
   CreateClinicalPatientRequest,
   FindClinicalPatientResponse,
   FinishEditingResponse,
+  FollowUpResponse,
   Paged,
   PatientSoapNoteItem,
   RetryConsultationResponse,
@@ -115,6 +116,14 @@ export const consultationsApi = {
       method: "POST",
       silent: true,
       keepalive,
+    }),
+
+  // Sets or changes the follow-up date (YYYY-MM-DD); null removes it. 400 DATE_IN_PAST for a past date.
+  setFollowUp: (consultationId: number, followUpDate: string | null) =>
+    api<FollowUpResponse>(`/consultations/${consultationId}/follow-up`, {
+      method: "PUT",
+      body: { followUpDate },
+      silent: true,
     }),
 
   // Made by the server on download, never stored.

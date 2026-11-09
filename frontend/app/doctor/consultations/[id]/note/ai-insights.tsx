@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
   ClipboardClock,
   ExternalLink,
+  Lock,
   Pencil,
   Pill,
   Plus,
@@ -60,7 +61,7 @@ const HISTORY_STATUS: Record<string, string> = {
   completed: "Finished",
 };
 
-const sectionClass = "rounded-[1.5rem] border bg-card p-5 sm:p-6";
+export const sectionClass = "rounded-[1.5rem] border bg-card p-5 sm:p-6";
 
 // Saves the edited prescription or symptoms; true when it worked.
 type SaveEdits = (changes: SoapNoteChanges) => Promise<boolean>;
@@ -123,13 +124,32 @@ export function AiWarnings({ warnings }: { warnings: AiWarning[] }) {
   );
 }
 
-export function AiInsightsPanel({ insights: initial, onSaveEdits }: { insights: AiInsights; onSaveEdits: SaveEdits }) {
+export function AiInsightsPanel({
+  insights: initial,
+  onSaveEdits,
+  locked = false,
+  onPrescriptionSaved,
+  onEditingPrescription,
+}: {
+  insights: AiInsights;
+  onSaveEdits: SaveEdits;
+  // true once the prescription is finalized: it cannot be edited and no suggestion can be accepted.
+  locked?: boolean;
+  onPrescriptionSaved?: (medicines: AiMedicine[]) => void;
+  // true while the prescription editor is open.
+  onEditingPrescription?: (editing: boolean) => void;
+}) {
   // The lists shown; replaced by the doctor's version after each saved edit.
   const [prescription, setPrescription] = useState(initial.prescription);
   const [symptoms, setSymptoms] = useState(initial.symptoms);
   // The prescription being edited, or null. Kept here, so accepting a suggestion can open it.
   const [drafts, setDrafts] = useState<MedicineDraft[] | null>(null);
   const prescriptionRef = useRef<HTMLElement>(null);
+  const editingPrescription = drafts !== null;
+
+  useEffect(() => {
+    onEditingPrescription?.(editingPrescription);
+  }, [editingPrescription, onEditingPrescription]);
 
   // Opens the prescription editor with the suggestion added, for the doctor to fill in and save.
   const accept = (medicine: AiMedicine) => {
@@ -149,7 +169,13 @@ export function AiInsightsPanel({ insights: initial, onSaveEdits }: { insights: 
         <h2 className="font-display text-lg font-bold tracking-tight">Found by MediAssist AI</h2>
       </div>
       {initial.forDoctorReview.length > 0 && (
-        <ReviewSection medicines={initial.forDoctorReview} saved={savedReviews} pending={pendingReviews} onAccept={accept} />
+        <ReviewSection
+          medicines={initial.forDoctorReview}
+          saved={savedReviews}
+          pending={pendingReviews}
+          onAccept={accept}
+          locked={locked}
+        />
       )}
       <PrescriptionSection
         sectionRef={prescriptionRef}
@@ -158,9 +184,12 @@ export function AiInsightsPanel({ insights: initial, onSaveEdits }: { insights: 
         setDrafts={setDrafts}
         aiMedicines={initial.prescription}
         reviewMedicines={initial.forDoctorReview}
+        locked={locked}
         onSave={async (edits) => {
           if (!(await onSaveEdits({ prescription: edits }))) return false;
-          setPrescription(edits.map((edit) => mergeMedicine(edit, initial.prescription, initial.forDoctorReview)));
+          const saved = edits.map((edit) => mergeMedicine(edit, initial.prescription, initial.forDoctorReview));
+          setPrescription(saved);
+          onPrescriptionSaved?.(saved);
           return true;
         }}
       />
@@ -214,7 +243,7 @@ function mergeSymptom(edit: SymptomEdit, aiSymptoms: AiSymptom[]): AiSymptom {
   };
 }
 
-function SectionHeader({
+export function SectionHeader({
   id,
   icon: Icon,
   title,
@@ -274,12 +303,14 @@ function ReviewSection({
   saved,
   pending,
   onAccept,
+  locked,
 }: {
   medicines: AiMedicine[];
   // reviewIndex values in the saved prescription, and in the prescription being edited.
   saved: Set<number | null>;
   pending: Set<number | null>;
   onAccept: (medicine: AiMedicine) => void;
+  locked: boolean;
 }) {
   // Rejected suggestions are hidden for this visit of the page only; nothing is saved for them.
   const [rejected, setRejected] = useState<Set<number>>(() => new Set());
@@ -297,14 +328,18 @@ function ReviewSection({
         id="ai-review-title"
         icon={TriangleAlert}
         title="Suggestions for your review"
-        hint="Medicines from the datasets that match the symptoms. The doctor did not prescribe these. Accept adds one to the prescription, where you can set the dose."
+        hint={
+          locked
+            ? "Medicines from the datasets that match the symptoms. The prescription is finalized, so they cannot be added any more."
+            : "Medicines from the datasets that match the symptoms. The doctor did not prescribe these. Accept adds one to the prescription, where you can set the dose."
+        }
         tone="bg-peach text-peach-foreground ring-1 ring-highlight/40"
       />
       <ul className="mt-5 space-y-3">
         {medicines.map((medicine, index) => {
           const inPrescription = saved.has(medicine.reviewIndex);
           const waiting = !inPrescription && pending.has(medicine.reviewIndex);
-          if (rejected.has(index) && !inPrescription && !waiting) {
+          if (rejected.has(index) && !inPrescription && !waiting && !locked) {
             return (
               <li key={index} className="flex items-center justify-between gap-3 rounded-2xl border border-dashed bg-card/60 px-4 py-3">
                 <p className="min-w-0 truncate text-sm text-muted-foreground">
@@ -336,7 +371,7 @@ function ReviewSection({
                       <Pencil aria-hidden="true" className="size-4" />
                       Added – save the prescription
                     </span>
-                  ) : (
+                  ) : locked ? null : (
                     <>
                       <Button size="sm" onClick={() => onAccept(medicine)}>
                         <Check aria-hidden="true" data-icon="inline-start" />
@@ -404,6 +439,7 @@ function PrescriptionSection({
   setDrafts,
   aiMedicines,
   reviewMedicines,
+  locked,
   onSave,
 }: {
   sectionRef: React.Ref<HTMLElement>;
@@ -412,10 +448,11 @@ function PrescriptionSection({
   setDrafts: React.Dispatch<React.SetStateAction<MedicineDraft[] | null>>;
   aiMedicines: AiMedicine[];
   reviewMedicines: AiMedicine[];
+  locked: boolean;
   onSave: (edits: PrescriptionEdit[]) => Promise<boolean>;
 }) {
   const [saving, setSaving] = useState(false);
-  const editing = drafts !== null;
+  const editing = drafts !== null && !locked;
   // A blank row is ignored; a row with any field filled needs a name.
   const filled = (d: MedicineDraft) => [d.name, d.genericName, d.dose, d.frequency, d.duration, d.instructions].some((v) => v.trim());
   const missingName = drafts?.some((d) => filled(d) && !d.name.trim()) ?? false;
@@ -448,18 +485,29 @@ function PrescriptionSection({
         icon={Pill}
         title="Prescription"
         hint={
-          editing
-            ? "Change, add or remove medicines. The medicine info stays while the name stays the same."
-            : "The medicines prescribed in the consultation, with their information from Dawaai and DVAGO."
+          locked
+            ? "This prescription is final and cannot be changed."
+            : editing
+              ? "Change, add or remove medicines. The medicine info stays while the name stays the same."
+              : "The medicines prescribed in the consultation, with their information from Dawaai and DVAGO."
         }
         tone="bg-mint text-mint-foreground"
-        action={!editing && <EditButton label="Edit prescription" onClick={() => setDrafts(medicines.length ? medicines.map(toDraft) : [emptyDraft()])} />}
+        action={
+          !locked &&
+          !editing && <EditButton label="Edit prescription" onClick={() => setDrafts(medicines.length ? medicines.map(toDraft) : [emptyDraft()])} />
+        }
       />
+      {locked && (
+        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-sm font-semibold text-secondary-foreground sm:ml-13">
+          <Lock aria-hidden="true" className="size-4" />
+          Prescription finalized
+        </p>
+      )}
 
       {editing ? (
         <>
           <ul className="mt-5 space-y-3">
-            {drafts.map((d, index) => (
+            {drafts!.map((d, index) => (
               <li
                 key={d.key}
                 className={cn("rounded-2xl border p-4", d.reviewIndex !== null ? "border-highlight/40 bg-peach/40" : "bg-muted/40")}
@@ -521,7 +569,7 @@ function PrescriptionSection({
         </>
       ) : medicines.length === 0 ? (
         <p className="mt-5 rounded-2xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-          No medicines were prescribed. Use Edit to add one.
+          {locked ? "No medicines were prescribed." : "No medicines were prescribed. Use Edit to add one."}
         </p>
       ) : (
         <div className="mt-5 overflow-hidden rounded-2xl border">
@@ -598,7 +646,7 @@ function Field({
   );
 }
 
-function Cell({ label, value }: { label: string; value: string | null }) {
+export function Cell({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="min-w-0">
       <p className="text-xs text-muted-foreground sm:hidden">{label}</p>

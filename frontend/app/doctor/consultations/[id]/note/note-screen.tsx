@@ -13,13 +13,17 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { usePrescription } from "@/hooks/use-prescription";
 import { SOAP_PARTS, useSoapNoteEditor, type SaveState } from "@/hooks/use-soap-note-editor";
 import { ApiError } from "@/lib/api/client";
 import { consultationQueryKey, consultationsApi, patientQueryKey, soapNoteQueryKey } from "@/lib/api/consultations";
-import type { Consultation, SoapNote, SoapNoteChanges, SoapPart } from "@/lib/api/types";
+import type { AiMedicine, Consultation, SoapNote, SoapNoteChanges, SoapPart } from "@/lib/api/types";
+import { pdfFileName, saveFile } from "@/lib/download";
 import { GENDER_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AiInsightsPanel, AiWarnings } from "./ai-insights";
+import { FollowUpCard } from "./follow-up-card";
+import { PrescriptionPanel } from "./prescription-panel";
 
 // A SOAP part is at most 10,000 characters (Consultation Service check).
 const MAX_PART_LENGTH = 10_000;
@@ -123,6 +127,10 @@ function NoteEditor({ consultation, note }: { consultation: Consultation; note: 
   const { values, setPart, saveState, saveNow, finishEditing } = useSoapNoteEditor(note);
   const [finishing, setFinishing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  // The saved prescription (listed when finalizing), and whether its editor is open.
+  const [medicines, setMedicines] = useState<AiMedicine[]>(() => note.aiInsights?.prescription ?? []);
+  const [editingPrescription, setEditingPrescription] = useState(false);
+  const finalized = !!usePrescription(consultation.consultationId).data;
 
   // Saves the last changes first, so the PDF has what is on the screen.
   const downloadPdf = async () => {
@@ -133,7 +141,7 @@ function NoteEditor({ consultation, note }: { consultation: Consultation; note: 
         return;
       }
       const pdf = await consultationsApi.downloadSoapNotePdf(consultation.consultationId);
-      saveFile(pdf, pdfFileName(consultation));
+      saveFile(pdf, pdfFileName("SOAP note", consultation.patient.fullName, consultation.startedAt));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "The PDF could not be downloaded. Please try again.");
     } finally {
@@ -204,8 +212,21 @@ function NoteEditor({ consultation, note }: { consultation: Consultation; note: 
             <SoapSection key={part} part={part} value={values[part]} onChange={(value) => setPart(part, value)} />
           ))}
           {note.aiInsights && (
-            <AiInsightsPanel insights={note.aiInsights} onSaveEdits={saveEdits} />
+            <AiInsightsPanel
+              insights={note.aiInsights}
+              onSaveEdits={saveEdits}
+              locked={finalized}
+              onPrescriptionSaved={setMedicines}
+              onEditingPrescription={setEditingPrescription}
+            />
           )}
+          <PrescriptionPanel
+            consultation={consultation}
+            medicines={medicines}
+            editing={editingPrescription}
+            beforeFinalize={() => saveNow()}
+          />
+          <FollowUpCard consultation={consultation} />
         </div>
         <PatientPanel consultation={consultation} />
       </div>
@@ -419,28 +440,6 @@ function formatDateTime(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-// Like "SOAP note - Bilal Hussain - 2026-10-07.pdf". Characters that file names cannot hold are removed.
-// The date is the local one, like the date shown above the note (startedAt is in UTC).
-function pdfFileName(consultation: Consultation) {
-  const name = consultation.patient.fullName.replace(/[\\/:*?"<>|]+/g, "").trim();
-  const started = new Date(consultation.startedAt);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const date = `${started.getFullYear()}-${pad(started.getMonth() + 1)}-${pad(started.getDate())}`;
-  return `SOAP note - ${name} - ${date}.pdf`;
-}
-
-function saveFile(file: Blob, fileName: string) {
-  const url = URL.createObjectURL(file);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  // Some browsers start the download after click() returns, so the link is freed a little later.
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function formatTime(iso: string) {

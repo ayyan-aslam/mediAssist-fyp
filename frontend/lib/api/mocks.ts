@@ -16,6 +16,9 @@
 // - Recording: every audio part is saved (201) and stop always succeeds.
 // - SOAP note: every consultation has the doc example note. Saved changes are kept until the page is reloaded.
 // - Patients, history, recent notes and search: every saved patient has one note (consultation 41, the doc example).
+// - Prescription (design doc 5.7 example): finalize saves the note's prescription. Send-options use the
+//   patient's saved email (Bilal has none: add one to send). A send is "sent" after 4 seconds, or
+//   "failed" when the email starts with "fail".
 
 const DOCTOR = {
   userId: 16,
@@ -130,6 +133,63 @@ const SOAP_NOTE = {
   },
 };
 let soapNoteChanged = false;
+let followUpDate: string | null = null;
+
+type MockPrescription = { prescriptionId: number; consultationId: number; [field: string]: unknown };
+let prescription: MockPrescription | null = null;
+const sends: { sendId: number; recipient: string; requestedAt: number }[] = [];
+const SEND_TAKES_MS = 4000;
+
+const maskEmail = (email: string) => {
+  const at = email.lastIndexOf("@");
+  return `${email.slice(0, Math.min(2, at))}***${email.slice(at)}`;
+};
+
+function finalize(consultationId: number): [number, unknown] {
+  if (prescription) return [409, { error: { code: "PRESCRIPTION_EXISTS", message: "This prescription is already final.", prescriptionId: prescription.prescriptionId } }];
+  const edited = (SOAP_NOTE as Record<string, unknown>).prescription as Record<string, unknown>[] | undefined;
+  const medicines = (edited ?? SOAP_NOTE.aiInsights.prescription) as Record<string, unknown>[];
+  if (medicines.length === 0) return error(409, "PRESCRIPTION_EMPTY", "The prescription has no medicines.");
+  prescription = {
+    prescriptionId: 33,
+    consultationId,
+    status: "final",
+    patientName: "Bilal Hussain",
+    notes: SOAP_NOTE.plan,
+    createdAt: new Date().toISOString(),
+    items: medicines.map((m, i) => ({
+      itemId: 101 + i,
+      position: i + 1,
+      medicineName: m.name,
+      genericName: m.genericName ?? null,
+      dose: m.dose ?? null,
+      frequency: m.frequency ?? null,
+      duration: m.duration ?? null,
+      instructions: m.instructions ?? null,
+      source: m.reviewIndex != null ? "ai_accepted" : m.aiIndex != null ? "doctor_prescribed" : "doctor_added",
+      referenceInfo: null,
+    })),
+  };
+  return [201, prescription];
+}
+
+function delivery(send: (typeof sends)[number]) {
+  const done = Date.now() - send.requestedAt >= SEND_TAKES_MS;
+  const failed = send.recipient.startsWith("fail");
+  return {
+    sendId: send.sendId,
+    channel: "email",
+    recipient: maskEmail(send.recipient),
+    status: done ? (failed ? "failed" : "sent") : "sending",
+    errorMessage: done && failed ? "The email address was not accepted." : null,
+    requestedAt: new Date(send.requestedAt).toISOString(),
+    completedAt: done ? new Date(send.requestedAt + SEND_TAKES_MS).toISOString() : null,
+  };
+}
+
+const patientEmail = () => CLINICAL_PATIENTS[0].email as string | null;
+const prescriptionOr404 = (id: string, then: () => [number, unknown?]) =>
+  prescription?.prescriptionId === Number(id) ? then() : error(404, "PRESCRIPTION_NOT_FOUND", "This prescription was not found.");
 
 // A paged list (design doc 5.1.2) of the given rows.
 function paged(rows: unknown[], query: URLSearchParams): [number, unknown] {
@@ -293,7 +353,7 @@ const routes: [string, RegExp, Handler][] = [
         patient: { clinicalPatientId: 7, fullName: "Bilal Hussain", phone: "03214567890" },
         status: "recording",
         failureReason: null,
-        followUpDate: null,
+        followUpDate,
         startedAt: new Date().toISOString(),
         endedAt: null,
       },
@@ -326,6 +386,60 @@ const routes: [string, RegExp, Handler][] = [
       soapNoteChanged = false;
       return [200, { changed }];
     },
+  ],
+  [
+    "PUT",
+    /^\/consultations\/(\d+)\/follow-up$/,
+    (body, [id]) => {
+      const date = body.followUpDate as string | null;
+      if (date !== null && date < new Date().toISOString().slice(0, 10)) return error(400, "DATE_IN_PAST", "The follow-up date cannot be in the past.");
+      followUpDate = date;
+      return [200, { consultationId: Number(id), followUpDate, patientReminder: date !== null && patientEmail() !== null }];
+    },
+  ],
+  ["POST", /^\/prescriptions$/, (body) => finalize(Number(body.consultationId))],
+  [
+    "GET",
+    /^\/prescriptions$/,
+    (_, __, query) =>
+      prescription && prescription.consultationId === Number(query.get("consultationId"))
+        ? [200, prescription]
+        : error(404, "PRESCRIPTION_NOT_FOUND", "This prescription was not found."),
+  ],
+  // The answer is not a real PDF; it only starts the download.
+  ["GET", /^\/prescriptions\/(\d+)\/pdf$/, (_, [id]) => prescriptionOr404(id, () => [200, { mock: "prescription PDF" }])],
+  [
+    "GET",
+    /^\/prescriptions\/(\d+)\/send-options$/,
+    (_, [id]) =>
+      prescriptionOr404(id, () => {
+        const email = patientEmail();
+        return [
+          200,
+          {
+            email: email ? { available: true, recipient: maskEmail(email) } : { available: false, recipient: null },
+            whatsapp: { available: false, reason: "Coming later" },
+          },
+        ];
+      }),
+  ],
+  [
+    "POST",
+    /^\/prescriptions\/(\d+)\/send$/,
+    (body, [id]) =>
+      prescriptionOr404(id, () => {
+        if (body.channel !== "email") return error(400, "CHANNEL_NOT_AVAILABLE", "This channel is not available.");
+        const email = patientEmail();
+        if (!email) return error(409, "NO_EMAIL", "This patient has no email address.");
+        const send = { sendId: sends.length + 9, recipient: email, requestedAt: Date.now() };
+        sends.unshift(send);
+        return [202, { sendId: send.sendId, status: "sending" }];
+      }),
+  ],
+  [
+    "GET",
+    /^\/prescriptions\/(\d+)\/deliveries$/,
+    (_, [id], query) => prescriptionOr404(id, () => paged(sends.map(delivery), query)),
   ],
   ["GET", /^\/admin\/users$/, () => [200, { items: [ADMIN_USER], page: 1, pageSize: 20, total: 1 }]],
   ["GET", /^\/admin\/users\/(\d+)$/, () => [200, ADMIN_USER]],
