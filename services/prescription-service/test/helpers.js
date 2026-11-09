@@ -76,7 +76,8 @@ function createFakeRepository() {
     async findById(prescriptionId, doctorId) {
       return withItems(prescriptions.find((p) => p.prescriptionId === prescriptionId && p.doctorId === doctorId)) ?? null;
     },
-    async create({ consultationId, doctorId, patientName, notes, items }) {
+    // Like the transaction: the row is kept only when savePdf succeeds.
+    async create({ consultationId, doctorId, patientName, notes, items }, savePdf) {
       if (prescriptions.some((p) => p.consultationId === consultationId)) throw uniqueViolation();
       const prescriptionId = prescriptions.length + 1;
       const row = {
@@ -90,11 +91,9 @@ function createFakeRepository() {
         createdAt: new Date(),
         items: items.map((item) => ({ itemId: nextItemId++, prescriptionId, ...item })),
       };
+      await savePdf(withItems(row));
       prescriptions.push(row);
       return withItems(row);
-    },
-    async delete(prescriptionId) {
-      prescriptions.splice(prescriptions.findIndex((p) => p.prescriptionId === prescriptionId), 1);
     },
     async createSend(data) {
       if (sends.some((s) => s.messageId === data.messageId)) throw uniqueViolation();

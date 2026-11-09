@@ -19,10 +19,17 @@ export class EmailSender {
   }
 }
 
-// Errors that will fail the same way on every try: the server refused the address or the login.
-// Network errors and 4xx answers (for example 421 or 450, try later) are worth another try.
+// The SMTP server refused our login (wrong SMTP_USER or SMTP_PASS, or Gmail blocked it for a while).
+export function isLoginError(err) {
+  return ['EAUTH', 'ENOAUTH'].includes(err.code);
+}
+
+// Errors that will fail the same way on every try: the server refused the address or the message.
+// Network errors, 4xx answers (for example 421 or 450, try later) and login errors (Gmail can refuse a
+// login for a short time) are worth another try.
 export function isPermanentEmailError(err) {
-  if (['EENVELOPE', 'EAUTH', 'ENOAUTH'].includes(err.code)) return true;
+  if (isLoginError(err)) return false;
+  if (err.code === 'EENVELOPE') return true;
   return err.responseCode >= 500 && err.responseCode < 600;
 }
 

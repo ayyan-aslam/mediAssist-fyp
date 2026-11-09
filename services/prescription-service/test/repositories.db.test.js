@@ -25,6 +25,9 @@ const newPrescription = (items = [{ position: 1, medicineName: 'Panadol', source
   items,
 });
 
+// The PDF upload, done before the commit.
+const savePdf = async () => {};
+
 describe.skipIf(!databaseUrl)('PrescriptionRepository (database)', () => {
   let prisma;
   let repository;
@@ -46,7 +49,7 @@ describe.skipIf(!databaseUrl)('PrescriptionRepository (database)', () => {
       { position: 2, medicineName: 'ORS', source: 'doctor_added', referenceInfo: null },
       { position: 1, medicineName: 'Panadol', source: 'ai_accepted', referenceInfo: { indication: 'Fever' } },
     ]);
-    const saved = await repository.create(data);
+    const saved = await repository.create(data, savePdf);
 
     expect(saved.pdfKey).toBe(`prescriptions/${saved.prescriptionId}.pdf`);
     expect(saved.patientName).toBe('بلال حسین');
@@ -54,17 +57,27 @@ describe.skipIf(!databaseUrl)('PrescriptionRepository (database)', () => {
     expect(saved.items[1].referenceInfo).toBeNull();
     expect(await repository.findById(saved.prescriptionId, doctorId - 1)).toBeNull();
 
-    await expect(repository.create({ ...data, items: [] })).rejects.toMatchObject({ code: 'P2002' });
+    await expect(repository.create({ ...data, items: [] }, savePdf)).rejects.toMatchObject({ code: 'P2002' });
   });
 
   it('refuses a line source outside the allowed values and rolls the whole prescription back', async () => {
     const data = newPrescription([{ position: 1, medicineName: 'Panadol', source: 'ai_suggested' }]);
-    await expect(repository.create(data)).rejects.toThrow();
+    await expect(repository.create(data, savePdf)).rejects.toThrow();
+    expect(await repository.findByConsultation(data.consultationId, doctorId)).toBeNull();
+  });
+
+  it('saves nothing when the PDF cannot be saved', async () => {
+    const data = newPrescription();
+    await expect(
+      repository.create(data, async () => {
+        throw new Error('S3 is down');
+      }),
+    ).rejects.toThrow('S3 is down');
     expect(await repository.findByConsultation(data.consultationId, doctorId)).toBeNull();
   });
 
   it('completes a send once, and lists the sends newest first', async () => {
-    const { prescriptionId } = await repository.create(newPrescription());
+    const { prescriptionId } = await repository.create(newPrescription(), savePdf);
     const first = crypto.randomUUID();
     const second = crypto.randomUUID();
     await repository.createSend({ prescriptionId, messageId: first, channel: 'email', recipient: 'ali@example.com', requestedAt: new Date('2026-10-07T09:40:00Z') });

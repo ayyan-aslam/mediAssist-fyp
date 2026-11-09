@@ -120,11 +120,14 @@ describe('prescription.send', () => {
     });
   });
 
-  it('does not retry a failed SMTP login', async () => {
+  it('tries a failed SMTP login 3 times, then saves failed with the login reason', async () => {
     ctx.emailSender.send.mockRejectedValue(smtpError('Invalid login: 535 5.7.8', { code: 'EAUTH', responseCode: 535 }));
     await handle();
-    expect(ctx.emailSender.send).toHaveBeenCalledTimes(1);
-    expect(ctx.deliveries[0].errorMessage).toBe('The email could not be sent. Please try again later.');
+    expect(ctx.emailSender.send).toHaveBeenCalledTimes(3);
+    expect(ctx.deliveries[0]).toMatchObject({
+      status: 'failed',
+      errorMessage: 'The email could not be sent: the clinic email account could not log in. Please tell the administrator.',
+    });
   });
 
   it('does not try an address that is not an email address', async () => {

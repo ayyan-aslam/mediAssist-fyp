@@ -5,6 +5,9 @@ export const pdfKeyOf = (prescriptionId) => `prescriptions/${prescriptionId}.pdf
 
 const WITH_ITEMS = { items: { orderBy: { position: 'asc' } } };
 
+// Long enough to build the PDF and upload it to S3 inside the finalize transaction.
+const FINALIZE_TIMEOUT_MS = 30_000;
+
 // Reads and saves PRESCRIPTION, PRESCRIPTION_ITEM and PRESCRIPTION_SEND (design doc Diagrams 8 and 9).
 // Every read takes the doctor, so a doctor never sees another doctor's prescription.
 export class PrescriptionRepository {
@@ -22,34 +25,36 @@ export class PrescriptionRepository {
 
   // The prescription and its lines in one transaction, with its PDF key. The key needs the new ID, so the
   // row is saved first and the key set right after, before anyone else can read it.
+  // savePdf(prescription) runs before the commit: when it fails (or the process stops), nothing is saved,
+  // so a prescription never exists without its PDF.
   // Throws a P2002 error when the consultation already has a prescription.
-  async create({ consultationId, doctorId, patientName, notes, items }) {
-    return this.prisma.$transaction(async (tx) => {
-      const { prescriptionId } = await tx.prescription.create({
-        data: {
-          consultationId,
-          doctorId,
-          status: 'final',
-          patientName,
-          notes,
-          pdfKey: '',
-          items: {
-            create: items.map((item) => ({ ...item, referenceInfo: item.referenceInfo ?? Prisma.DbNull })),
+  async create({ consultationId, doctorId, patientName, notes, items }, savePdf) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const { prescriptionId } = await tx.prescription.create({
+          data: {
+            consultationId,
+            doctorId,
+            status: 'final',
+            patientName,
+            notes,
+            pdfKey: '',
+            items: {
+              create: items.map((item) => ({ ...item, referenceInfo: item.referenceInfo ?? Prisma.DbNull })),
+            },
           },
-        },
-        select: { prescriptionId: true },
-      });
-      return tx.prescription.update({
-        where: { prescriptionId },
-        data: { pdfKey: pdfKeyOf(prescriptionId) },
-        include: WITH_ITEMS,
-      });
-    });
-  }
-
-  // Only used when the PDF could not be saved, before the prescription was ever sent. The lines go too.
-  async delete(prescriptionId) {
-    await this.prisma.prescription.delete({ where: { prescriptionId } });
+          select: { prescriptionId: true },
+        });
+        const prescription = await tx.prescription.update({
+          where: { prescriptionId },
+          data: { pdfKey: pdfKeyOf(prescriptionId) },
+          include: WITH_ITEMS,
+        });
+        await savePdf(prescription);
+        return prescription;
+      },
+      { timeout: FINALIZE_TIMEOUT_MS },
+    );
   }
 
   async createSend({ prescriptionId, messageId, channel, recipient, requestedAt }) {

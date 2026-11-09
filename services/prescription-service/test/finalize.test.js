@@ -97,7 +97,7 @@ describe('POST /prescriptions (finalize)', () => {
     expect(after.body.error.prescriptionId).toBeUndefined();
   });
 
-  it('removes the prescription and returns 503 when the PDF upload fails, so the doctor can try again', async () => {
+  it('saves nothing and returns 503 when the PDF upload fails, so the doctor can try again', async () => {
     ctx.s3Client.upload.mockRejectedValueOnce(new Error('S3 is down'));
     const failed = await ctx.finalize();
     expect(failed.status).toBe(503);

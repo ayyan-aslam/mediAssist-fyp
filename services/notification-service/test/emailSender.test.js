@@ -53,13 +53,13 @@ describe('EmailSender', () => {
 describe('email errors', () => {
   const err = (fields) => Object.assign(new Error('x'), fields);
 
-  it('treats refused addresses, failed logins and 5xx answers as permanent', () => {
+  it('treats refused addresses and 5xx answers as permanent', () => {
     expect(isPermanentEmailError(err({ code: 'EENVELOPE' }))).toBe(true);
-    expect(isPermanentEmailError(err({ code: 'EAUTH', responseCode: 535 }))).toBe(true);
     expect(isPermanentEmailError(err({ code: 'EMESSAGE', responseCode: 552 }))).toBe(true);
   });
 
-  it('retries network errors and 4xx answers', () => {
+  it('retries network errors, 4xx answers and failed logins', () => {
+    expect(isPermanentEmailError(err({ code: 'EAUTH', responseCode: 535 }))).toBe(false);
     expect(isPermanentEmailError(err({ code: 'ETIMEDOUT' }))).toBe(false);
     expect(isPermanentEmailError(err({ code: 'ECONNECTION' }))).toBe(false);
     expect(isPermanentEmailError(err({ code: 'EMESSAGE', responseCode: 421 }))).toBe(false);

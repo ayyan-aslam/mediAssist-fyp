@@ -1,16 +1,24 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { z } from 'zod';
-import { isPermanentEmailError, isRejectedAddressError } from '../clients/EmailSender.js';
+import { isLoginError, isPermanentEmailError, isRejectedAddressError } from '../clients/EmailSender.js';
 import { prescriptionEmail } from './emails.js';
 
 export const MAX_EMAIL_TRIES = 3;
 
 const INVALID_ADDRESS = "The patient's email address is not valid.";
 const REJECTED_ADDRESS = "The patient's email address was rejected by the mail server.";
+const LOGIN_FAILED = 'The email could not be sent: the clinic email account could not log in. Please tell the administrator.';
 const NOT_SENT = 'The email could not be sent. Please try again later.';
 const PDF_NOT_READ = 'The prescription PDF could not be read. Please try again.';
 
 const isEmail = (value) => z.email().safeParse(value).success;
+
+// The reason the doctor sees after the last try.
+function failureReason(err) {
+  if (isRejectedAddressError(err)) return REJECTED_ADDRESS;
+  if (isLoginError(err)) return LOGIN_FAILED;
+  return NOT_SENT;
+}
 
 // Sends the prescription PDF by email, tries up to 3 times, saves the result in PRESCRIPTION_DELIVERY and
 // sends delivery.result (design doc Diagram 9, 6.4.7 and 6.4.8).
@@ -71,7 +79,7 @@ export class DeliveryService {
         const permanent = isPermanentEmailError(err);
         this.logger.warn({ ...log, err, tryNo, permanent }, 'Prescription email failed');
         if (permanent || tryNo === MAX_EMAIL_TRIES) {
-          return { status: 'failed', errorMessage: isRejectedAddressError(err) ? REJECTED_ADDRESS : NOT_SENT, attemptedAt };
+          return { status: 'failed', errorMessage: failureReason(err), attemptedAt };
         }
         await sleep(this.retryDelayMs);
       }

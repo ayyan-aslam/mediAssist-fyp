@@ -33,7 +33,8 @@ async function webmPart(seconds, frequency) {
 
 const mergeDirs = async () => (await readdir(tmpdir())).filter((name) => name.startsWith('mediassist-merge-'));
 
-// Uses the real ffmpeg. Skipped when ffmpeg is not on the PATH.
+// Uses the real ffmpeg (4 runs in the first test; slow on a busy machine). Skipped when ffmpeg is not on the PATH.
+const FFMPEG_TIMEOUT_MS = 30_000;
 describe.skipIf(!hasFfmpeg())('AudioMerger', () => {
   beforeAll(async () => {
     workDir = await mkdtemp(path.join(tmpdir(), 'mediassist-test-'));
@@ -58,7 +59,7 @@ describe.skipIf(!hasFfmpeg())('AudioMerger', () => {
     expect(info.streams[0]).toMatchObject({ codec_name: 'mp3', channels: 1, sample_rate: '16000' });
     expect(Number(info.format.duration)).toBeCloseTo(5, 0);
     expect(await mergeDirs()).toEqual(before);
-  });
+  }, FFMPEG_TIMEOUT_MS);
 
   it('deletes its temp files when ffmpeg fails', async () => {
     const before = await mergeDirs();

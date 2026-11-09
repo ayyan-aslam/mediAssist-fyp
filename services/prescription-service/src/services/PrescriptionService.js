@@ -72,46 +72,36 @@ export class PrescriptionService {
     const source = await this.consultationClient.getPrescriptionSource(consultationId, doctorId);
     if (source.medicines.length === 0) throw prescriptionEmptyError();
 
+    const data = {
+      consultationId,
+      doctorId,
+      patientName: clip(source.patient.name, 150),
+      notes: source.notes || null,
+      items: source.medicines.map((medicine, i) => ({
+        position: i + 1,
+        medicineName: clip(medicine.name, 200),
+        genericName: clip(medicine.genericName, 200),
+        dose: clip(medicine.dose, 100),
+        frequency: clip(medicine.frequency, 100),
+        duration: clip(medicine.duration, 100),
+        instructions: clip(medicine.instructions, 500),
+        source: medicine.source,
+        referenceInfo: medicine.referenceInfo ?? null,
+      })),
+    };
+
     let prescription;
     try {
-      prescription = await this.prescriptionRepository.create({
-        consultationId,
-        doctorId,
-        patientName: clip(source.patient.name, 150),
-        notes: source.notes || null,
-        items: source.medicines.map((medicine, i) => ({
-          position: i + 1,
-          medicineName: clip(medicine.name, 200),
-          genericName: clip(medicine.genericName, 200),
-          dose: clip(medicine.dose, 100),
-          frequency: clip(medicine.frequency, 100),
-          duration: clip(medicine.duration, 100),
-          instructions: clip(medicine.instructions, 500),
-          source: medicine.source,
-          referenceInfo: medicine.referenceInfo ?? null,
-        })),
-      });
+      // The PDF is saved before the prescription is committed: without its PDF it could not be downloaded
+      // or sent, so when the PDF fails nothing is saved and the doctor can try again.
+      prescription = await this.prescriptionRepository.create(data, (saved) =>
+        this.#savePdf(saved, doctorName, source.patient),
+      );
     } catch (err) {
       // The same doctor pressed finalize twice at once: the other request saved it first.
       if (!isUniqueViolation(err)) throw err;
       const saved = await this.prescriptionRepository.findByConsultation(consultationId, doctorId);
       throw prescriptionExistsError(saved?.prescriptionId ?? null);
-    }
-
-    try {
-      const pdf = await this.prescriptionPdf.build({
-        doctorName,
-        patient: source.patient,
-        date: prescription.createdAt,
-        items: prescription.items,
-        notes: prescription.notes,
-      });
-      await this.s3Client.upload(prescription.pdfKey, pdf, 'application/pdf');
-    } catch (err) {
-      // Without its PDF the prescription cannot be downloaded or sent. Remove it, so the doctor can try again.
-      this.logger.error({ err, consultationId }, 'Could not save the prescription PDF');
-      await this.prescriptionRepository.delete(prescription.prescriptionId);
-      throw serviceUnavailableError();
     }
 
     this.logger.info({ consultationId, prescriptionId: prescription.prescriptionId }, 'Prescription finalized');
@@ -228,6 +218,22 @@ export class PrescriptionService {
     });
     if (!changed) {
       this.logger.info({ requestMessageId: data.requestMessageId }, 'Delivery result already saved or unknown. Skipped.');
+    }
+  }
+
+  async #savePdf(prescription, doctorName, patient) {
+    try {
+      const pdf = await this.prescriptionPdf.build({
+        doctorName,
+        patient,
+        date: prescription.createdAt,
+        items: prescription.items,
+        notes: prescription.notes,
+      });
+      await this.s3Client.upload(prescription.pdfKey, pdf, 'application/pdf');
+    } catch (err) {
+      this.logger.error({ err, consultationId: prescription.consultationId }, 'Could not save the prescription PDF');
+      throw serviceUnavailableError();
     }
   }
 
