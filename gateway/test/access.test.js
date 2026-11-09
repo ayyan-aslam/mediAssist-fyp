@@ -5,20 +5,24 @@ import { admin, buildApp, doctor, patient, serviceUrl, signToken, startEchoServi
 
 let authService;
 let consultationService;
+let prescriptionService;
 let services;
 
 beforeAll(async () => {
   authService = await startEchoService('auth');
   consultationService = await startEchoService('consultation');
+  prescriptionService = await startEchoService('prescription');
   services = {
     AUTH_SERVICE_URL: serviceUrl(authService),
     CONSULTATION_SERVICE_URL: serviceUrl(consultationService),
+    PRESCRIPTION_SERVICE_URL: serviceUrl(prescriptionService),
   };
 });
 
 afterAll(() => {
   authService.close();
   consultationService.close();
+  prescriptionService.close();
 });
 
 const bearer = async (user) => `Bearer ${await signToken(user)}`;
@@ -57,17 +61,17 @@ describe('role check', () => {
     expect(res.status).toBe(401);
   });
 
-  // Every Consultation Service route in the table: a doctor gets through, a patient does not.
-  const consultationRoutes = ROUTES.filter((route) => route.service === 'consultation');
-  for (const route of consultationRoutes) {
+  // Every Consultation and Prescription Service route in the table: a doctor gets through, a patient does not.
+  const doctorRoutes = ROUTES.filter((route) => ['consultation', 'prescription'].includes(route.service));
+  for (const route of doctorRoutes) {
     const path = route.path.replace(/:\w+/g, '41');
 
-    it(`forwards ${route.method} ${route.path} for a doctor to the Consultation Service`, async () => {
+    it(`forwards ${route.method} ${route.path} for a doctor to the ${route.service} service`, async () => {
       const app = buildApp(services);
       const res = await request(app)[route.method.toLowerCase()](`/api/v1${path}`)
         .set('Authorization', await bearer(doctor));
       expect(res.status).toBe(200);
-      expect(res.body.service).toBe('consultation');
+      expect(res.body.service).toBe(route.service);
       expect(res.body.method).toBe(route.method);
       expect(res.body.url).toBe(path);
       expect(res.body.headers['x-user-id']).toBe('16');

@@ -1,0 +1,68 @@
+// PrescriptionDB tables: design doc Section 4.4.5.
+// Check constraints (Section 4.6) are added as raw SQL in the migration, because Prisma cannot model them.
+// The indexes (Section 4.9: every foreign key column) are listed here too, so later migrations do not drop them.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Prescription {
+  prescriptionId Int      @id @default(autoincrement()) @map("prescription_id")
+  // Logical reference to CONSULTATION in ConsultationDB. One consultation has at most one prescription.
+  consultationId Int      @unique @map("consultation_id")
+  // Logical reference to USERS in UserDB.
+  doctorId       Int      @map("doctor_id")
+  status         String   @db.VarChar(10)
+  patientName    String   @map("patient_name") @db.VarChar(150)
+  notes          String?
+  pdfKey         String   @map("pdf_key") @db.VarChar(255)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  items PrescriptionItem[]
+  sends PrescriptionSend[]
+
+  @@index([doctorId], map: "prescription_doctor_id_idx")
+  @@map("prescription")
+}
+
+model PrescriptionItem {
+  itemId         Int     @id @default(autoincrement()) @map("item_id")
+  prescriptionId Int     @map("prescription_id")
+  position       Int     @db.SmallInt
+  medicineName   String  @map("medicine_name") @db.VarChar(200)
+  genericName    String? @map("generic_name") @db.VarChar(200)
+  dose           String? @db.VarChar(100)
+  frequency      String? @db.VarChar(100)
+  duration       String? @db.VarChar(100)
+  instructions   String? @db.VarChar(500)
+  source         String  @db.VarChar(20)
+  referenceInfo  Json?   @map("reference_info") @db.JsonB
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [prescriptionId], onDelete: Cascade)
+
+  @@index([prescriptionId], map: "prescription_item_prescription_id_idx")
+  @@map("prescription_item")
+}
+
+model PrescriptionSend {
+  sendId         Int       @id @default(autoincrement()) @map("send_id")
+  prescriptionId Int       @map("prescription_id")
+  // The messageId of the prescription.send message (design doc 6.4.7).
+  messageId      String    @unique @map("message_id") @db.Uuid
+  channel        String    @db.VarChar(10)
+  recipient      String    @db.VarChar(150)
+  status         String    @db.VarChar(10)
+  errorMessage   String?   @map("error_message") @db.VarChar(255)
+  requestedAt    DateTime  @map("requested_at") @db.Timestamp(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamp(6)
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [prescriptionId])
+
+  @@index([prescriptionId], map: "prescription_send_prescription_id_idx")
+  @@map("prescription_send")
+}

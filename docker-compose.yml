@@ -90,6 +90,42 @@ services:
       retries: 5
       start_period: 30s
 
+  # Prescription Service. Starts only with the services profile, like the Consultation Service above
+  # (in daily work it runs on the host with npm run dev, on the same port).
+  prescription-service:
+    profiles: ["services"]
+    build:
+      context: .
+      dockerfile: services/prescription-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      # Same login as in .env, but the hosts are the Docker service names.
+      PRESCRIPTION_DATABASE_URL: postgresql://prescription_service:${PRESCRIPTION_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=prescriptiondb
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      CONSULTATION_SERVICE_URL: http://consultation-service:3002
+      PRESCRIPTION_SERVICE_PORT: 3003
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+    ports:
+      - "127.0.0.1:${PRESCRIPTION_SERVICE_PORT:-3003}:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      # It reads its queue, which the Consultation Service creates.
+      consultation-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3003/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # AI Pipeline (agent/). Starts only with the services profile, like the Consultation Service above
   # (in daily work it runs on the host: python -m mediassist_agent.run --rabbitmq in agent\).
   # It only connects: until the Consultation Service has created the queues, it tries again every 5 seconds.

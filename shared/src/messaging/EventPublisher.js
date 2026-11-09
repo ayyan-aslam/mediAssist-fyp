@@ -14,9 +14,10 @@ export class EventPublisher {
 
   // Resolves when RabbitMQ has saved the message (publisher confirm). Returns the sent message.
   // Rejects at once when RabbitMQ is not connected, so callers never wait for a reconnect.
-  async publish(type, data) {
+  // messageId: optional, for a caller that saved the ID before sending (for example PRESCRIPTION_SEND).
+  async publish(type, data, { messageId = randomUUID() } = {}) {
     const message = {
-      messageId: randomUUID(),
+      messageId,
       type,
       version: 1,
       source: this.source,

@@ -42,6 +42,15 @@ export const ROUTES = [
   },
   { method: 'GET', path: '/consultations/:consultationId/soap-note/pdf', service: 'consultation', roles: DOCTOR },
   { method: 'PUT', path: '/consultations/:consultationId/follow-up', service: 'consultation', roles: DOCTOR },
+
+  // Prescription Service (Section 5.7)
+  { method: 'POST', path: '/prescriptions', service: 'prescription', roles: DOCTOR },
+  { method: 'GET', path: '/prescriptions', service: 'prescription', roles: DOCTOR },
+  { method: 'GET', path: '/prescriptions/:prescriptionId', service: 'prescription', roles: DOCTOR },
+  { method: 'GET', path: '/prescriptions/:prescriptionId/pdf', service: 'prescription', roles: DOCTOR },
+  { method: 'GET', path: '/prescriptions/:prescriptionId/send-options', service: 'prescription', roles: DOCTOR },
+  { method: 'POST', path: '/prescriptions/:prescriptionId/send', service: 'prescription', roles: DOCTOR },
+  { method: 'GET', path: '/prescriptions/:prescriptionId/deliveries', service: 'prescription', roles: DOCTOR },
 ];
 
 export function isSseRoute(route) {

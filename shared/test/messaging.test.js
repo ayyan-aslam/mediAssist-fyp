@@ -211,6 +211,19 @@ describe('EventPublisher', () => {
     expect(model.createConfirmChannel).toHaveBeenCalledTimes(1);
   });
 
+  it('uses the messageId the caller gives', async () => {
+    const { connection, connect } = await startConnection();
+    const model = await connect();
+    const publisher = new EventPublisher({ connection, source: 'prescription-service', logger: fakeLogger() });
+    const messageId = 'a1b2c3d4-0005-4000-8000-000000000005';
+
+    const message = await publisher.publish('prescription.send', {}, { messageId });
+    expect(message.messageId).toBe(messageId);
+    const [, , content, options] = model.channel.publish.mock.calls[0];
+    expect(JSON.parse(content.toString('utf8')).messageId).toBe(messageId);
+    expect(options.messageId).toBe(messageId);
+  });
+
   it('rejects at once when RabbitMQ is not connected', async () => {
     const { connection } = await startConnection();
     const publisher = new EventPublisher({ connection, source: 'auth-service', logger: fakeLogger() });

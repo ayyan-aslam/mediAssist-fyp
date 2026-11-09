@@ -8,7 +8,11 @@ let app;
 
 beforeAll(async () => {
   upstream = await startEchoService('auth');
-  app = buildApp({ AUTH_SERVICE_URL: serviceUrl(upstream), CONSULTATION_SERVICE_URL: serviceUrl(upstream) });
+  app = buildApp({
+    AUTH_SERVICE_URL: serviceUrl(upstream),
+    CONSULTATION_SERVICE_URL: serviceUrl(upstream),
+    PRESCRIPTION_SERVICE_URL: serviceUrl(upstream),
+  });
 });
 
 afterAll(() => {
@@ -138,7 +142,11 @@ describe('unknown routes', () => {
 
 describe('service down', () => {
   it('returns 503 when the service does not answer', async () => {
-    const downApp = buildApp({ AUTH_SERVICE_URL: 'http://127.0.0.1:1', CONSULTATION_SERVICE_URL: 'http://127.0.0.1:1' });
+    const downApp = buildApp({
+      AUTH_SERVICE_URL: 'http://127.0.0.1:1',
+      CONSULTATION_SERVICE_URL: 'http://127.0.0.1:1',
+      PRESCRIPTION_SERVICE_URL: 'http://127.0.0.1:1',
+    });
     const res = await request(downApp).get('/api/v1/specialties');
     expect(res.status).toBe(503);
     expect(res.body.error.code).toBe('SERVICE_UNAVAILABLE');

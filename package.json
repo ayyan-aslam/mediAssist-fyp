@@ -17,7 +17,7 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "concurrently --names gateway,auth,consultation --prefix-colors cyan,magenta,green \"npm run dev -w gateway\" \"npm run dev -w services/auth-service\" \"npm run dev -w services/consultation-service\"",
+    "dev": "concurrently --names gateway,auth,consultation,prescription --prefix-colors cyan,magenta,green,yellow \"npm run dev -w gateway\" \"npm run dev -w services/auth-service\" \"npm run dev -w services/consultation-service\" \"npm run dev -w services/prescription-service\"",
     "test": "npm test --workspaces --if-present",
     "lint": "eslint ."
   },

@@ -16,6 +16,7 @@ export function createRouter({ config, logger }) {
   const serviceUrls = {
     auth: config.AUTH_SERVICE_URL,
     consultation: config.CONSULTATION_SERVICE_URL,
+    prescription: config.PRESCRIPTION_SERVICE_URL,
   };
 
   const proxies = new Map();
