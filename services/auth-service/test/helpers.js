@@ -39,6 +39,18 @@ function createFakeRepositories() {
   ];
   let nextTokenId = 1;
 
+  // The row that UserRepository.findAdminPage selects. The CNIC is never in it.
+  function toAdminRow(user) {
+    const doctor = doctorProfiles.find((item) => item.userId === user.userId);
+    const { firebaseUid, ...fields } = user;
+    return {
+      ...fields,
+      doctorProfile: doctor
+        ? { specialty: specialties.find((item) => item.specialtyId === doctor.specialtyId) ?? null }
+        : null,
+    };
+  }
+
   const userRepository = {
     async findDuplicates({ email, phone, cnicHash, registrationNo }) {
       const taken = [];
@@ -52,7 +64,7 @@ function createFakeRepositories() {
     },
     createUserWithProfile: vi.fn(async ({ firebaseUid, fullName, email, phone, role, profile }) => {
       const userId = users.length + 1;
-      users.push({ userId, firebaseUid, fullName, email, phone, role, accountStatus: 'active' });
+      users.push({ userId, firebaseUid, fullName, email, phone, role, accountStatus: 'active', createdAt: new Date() });
       if (role === 'doctor') doctorProfiles.push({ userId, ...profile });
       return userId;
     }),
@@ -85,6 +97,42 @@ function createFakeRepositories() {
           : null,
       };
     },
+    async findAdminPage({ search, role, status, specialtyId }, { page, pageSize }) {
+      const text = search?.toLowerCase();
+      const matches = users
+        .filter((user) => !role || user.role === role)
+        .filter((user) => !status || user.accountStatus === status)
+        .filter((user) => !specialtyId || toAdminRow(user).doctorProfile?.specialty?.specialtyId === specialtyId)
+        .filter(
+          (user) =>
+            !text ||
+            user.fullName.toLowerCase().includes(text) ||
+            user.email.toLowerCase().includes(text) ||
+            (user.phone ?? '').includes(search),
+        )
+        .sort((a, b) => b.createdAt - a.createdAt || b.userId - a.userId);
+      return { items: matches.slice((page - 1) * pageSize, page * pageSize).map(toAdminRow), total: matches.length };
+    },
+    async findAdminUserById(userId) {
+      const user = users.find((item) => item.userId === userId);
+      return user ? toAdminRow(user) : null;
+    },
+    async findNamesByIds(userIds) {
+      return users
+        .filter((user) => userIds.includes(user.userId))
+        .sort((a, b) => a.userId - b.userId)
+        .map(({ userId, fullName, role }) => ({ userId, fullName, role }));
+    },
+    // Like the real transaction: nothing is saved when beforeCommit throws.
+    updateStatus: vi.fn(async (userId, accountStatus, beforeCommit) => {
+      await beforeCommit();
+      users.find((user) => user.userId === userId).accountStatus = accountStatus;
+      if (accountStatus === 'suspended') {
+        for (let i = refreshTokens.length - 1; i >= 0; i -= 1) {
+          if (refreshTokens[i].userId === userId) refreshTokens.splice(i, 1);
+        }
+      }
+    }),
     updateProfile: vi.fn(async (userId, role, { fullName, phone, profile }) => {
       const user = users.find((item) => item.userId === userId);
       if (fullName !== undefined) user.fullName = fullName;
@@ -138,6 +186,9 @@ function createFirebaseMock() {
   return {
     createUser: vi.fn(async () => `firebase-uid-${nextUid++}`),
     deleteUser: vi.fn(async () => {}),
+    disableUser: vi.fn(async () => {}),
+    enableUser: vi.fn(async () => {}),
+    revokeRefreshTokens: vi.fn(async () => {}),
     verifyIdToken: vi.fn(async () => {
       throw new Error('Firebase ID token has invalid signature');
     }),

@@ -1,9 +1,11 @@
 import { errorHandler } from '@mediassist/common';
 import express from 'express';
+import { AdminUserController } from './controllers/AdminUserController.js';
 import { AuthController } from './controllers/AuthController.js';
 import { ProfileController } from './controllers/ProfileController.js';
 import { SpecialtyController } from './controllers/SpecialtyController.js';
 import { createRouter } from './routes.js';
+import { AdminUserService } from './services/AdminUserService.js';
 import { AuthService } from './services/AuthService.js';
 import { CnicEncryptor } from './services/CnicEncryptor.js';
 import { ProfileService } from './services/ProfileService.js';
@@ -41,13 +43,18 @@ export function createApp({
     specialtyService: new SpecialtyService(specialtyRepository),
   });
 
+  const adminUserController = new AdminUserController({
+    requestValidator,
+    adminUserService: new AdminUserService({ userRepository, firebaseClient, eventPublisher, logger }),
+  });
+
   const app = express();
   app.use(express.json());
 
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
   });
-  app.use(createRouter({ authController, profileController, specialtyController }));
+  app.use(createRouter({ authController, profileController, specialtyController, adminUserController }));
 
   app.use(errorHandler(logger));
   return app;

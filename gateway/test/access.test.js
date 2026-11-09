@@ -87,6 +87,62 @@ describe('role check', () => {
   }
 });
 
+describe('admin routes', () => {
+  // Every /admin route in the table: an admin gets through, a doctor and a patient do not.
+  const adminRoutes = ROUTES.filter((route) => route.path.startsWith('/admin/'));
+
+  it('has the four admin user routes of design doc 5.2', () => {
+    expect(adminRoutes.map((route) => `${route.method} ${route.path}`)).toEqual(
+      expect.arrayContaining([
+        'GET /admin/users',
+        'GET /admin/users/:userId',
+        'POST /admin/users/:userId/suspend',
+        'POST /admin/users/:userId/activate',
+      ]),
+    );
+  });
+
+  for (const route of adminRoutes) {
+    const path = route.path.replace(/:\w+/g, '16');
+
+    it(`forwards ${route.method} ${route.path} for an admin to the ${route.service} service`, async () => {
+      const app = buildApp(services);
+      const res = await request(app)[route.method.toLowerCase()](`/api/v1${path}`)
+        .set('Authorization', await bearer(admin));
+      expect(res.status).toBe(200);
+      expect(res.body.service).toBe(route.service);
+      expect(res.body.url).toBe(path);
+      expect(res.body.headers['x-user-id']).toBe('1');
+      expect(res.body.headers['x-user-role']).toBe('admin');
+    });
+
+    for (const user of [doctor, patient]) {
+      it(`blocks ${route.method} ${route.path} for a ${user.role}`, async () => {
+        const app = buildApp(services);
+        const res = await request(app)[route.method.toLowerCase()](`/api/v1${path}`)
+          .set('Authorization', await bearer(user));
+        expect(res.status).toBe(403);
+        expect(res.body.error.code).toBe('FORBIDDEN');
+      });
+    }
+  }
+
+  it('forwards the search query of GET /admin/users', async () => {
+    const app = buildApp(services);
+    const res = await request(app)
+      .get('/api/v1/admin/users?search=sara&role=doctor&page=2')
+      .set('Authorization', await bearer(admin));
+    expect(res.body.url).toBe('/admin/users?search=sara&role=doctor&page=2');
+  });
+
+  it('does not expose the internal users route', async () => {
+    const app = buildApp(services);
+    const res = await request(app).get('/api/v1/internal/users?ids=15,16').set('Authorization', await bearer(admin));
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('ROUTE_NOT_FOUND');
+  });
+});
+
 describe('follow-up and internal routes', () => {
   it('forwards PUT /consultations/{id}/follow-up with the body and the doctor name and email', async () => {
     const app = buildApp(services);

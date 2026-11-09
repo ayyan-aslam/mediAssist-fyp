@@ -27,6 +27,7 @@ model User {
 
   @@index([fullName(ops: raw("gin_trgm_ops"))], type: Gin, map: "users_full_name_trgm_idx")
   @@index([phone(ops: raw("gin_trgm_ops"))], type: Gin, map: "users_phone_trgm_idx")
+  @@index([email(ops: raw("gin_trgm_ops"))], type: Gin, map: "users_email_trgm_idx")
   @@map("users")
 }
 

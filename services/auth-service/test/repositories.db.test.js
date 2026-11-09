@@ -148,4 +148,70 @@ describe.skipIf(!databaseUrl)('repositories (database)', () => {
       expect(Object.keys(item)).toEqual(['specialtyId', 'name']);
     }
   });
+  it('searches users by part of the name, email or phone, with filters and pages, without the CNIC', async () => {
+    const doctor = newDoctor('search');
+    doctor.fullName = `Dr. ${prefix} Zainab`;
+    const userId = await users.createUserWithProfile(doctor);
+    const page = { page: 1, pageSize: 20 };
+
+    for (const search of [prefix.toUpperCase(), 'zainab', doctor.phone.slice(3, 9), `${prefix}-search@`]) {
+      const { items } = await users.findAdminPage({ search }, page);
+      expect(items.map((item) => item.userId)).toContain(userId);
+    }
+    const { items, total } = await users.findAdminPage({ search: `${prefix}-search`, role: 'doctor', status: 'active' }, page);
+    expect(total).toBe(1);
+    expect(items[0]).toEqual({
+      userId,
+      fullName: doctor.fullName,
+      email: doctor.email,
+      phone: doctor.phone,
+      role: 'doctor',
+      accountStatus: 'active',
+      createdAt: expect.any(Date),
+      doctorProfile: { specialty: null },
+    });
+    expect((await users.findAdminPage({ search: `${prefix}-search`, role: 'patient' }, page)).total).toBe(0);
+    expect((await users.findAdminPage({ search: `${prefix}-search`, status: 'suspended' }, page)).total).toBe(0);
+    expect(await users.findAdminUserById(userId)).toEqual(items[0]);
+    expect(await users.findNamesByIds([userId, 2_000_000_000])).toEqual([
+      { userId, fullName: doctor.fullName, role: 'doctor' },
+    ]);
+  });
+
+  it('uses the trigram indexes for a partial search on name, email and phone', async () => {
+    const plan = await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe('SET LOCAL enable_seqscan = off');
+      return tx.$queryRawUnsafe(
+        "EXPLAIN SELECT user_id FROM users WHERE full_name ILIKE '%sara%' OR email ILIKE '%sara%' OR phone LIKE '%4567%'",
+      );
+    });
+    const text = plan.map((row) => row['QUERY PLAN']).join(' ');
+    for (const index of ['users_full_name_trgm_idx', 'users_email_trgm_idx', 'users_phone_trgm_idx']) {
+      expect(text).toContain(index);
+    }
+  });
+
+  it('suspends a user and deletes all their refresh tokens in one transaction', async () => {
+    const userId = await users.createUserWithProfile(newDoctor('suspend'));
+    const expiresAt = new Date(Date.now() + 60_000);
+    for (let i = 0; i < 2; i += 1) {
+      await tokens.save({ userId, tokenHash: crypto.randomBytes(32).toString('hex'), expiresAt });
+    }
+
+    // Sending the messages fails: nothing is saved.
+    await expect(
+      users.updateStatus(userId, 'suspended', async () => {
+        throw new Error('RabbitMQ is not connected.');
+      }),
+    ).rejects.toThrow('RabbitMQ');
+    expect((await users.findById(userId)).accountStatus).toBe('active');
+    expect(await prisma.refreshToken.count({ where: { userId } })).toBe(2);
+
+    await users.updateStatus(userId, 'suspended', async () => {});
+    expect((await users.findById(userId)).accountStatus).toBe('suspended');
+    expect(await prisma.refreshToken.count({ where: { userId } })).toBe(0);
+
+    await users.updateStatus(userId, 'active', async () => {});
+    expect((await users.findById(userId)).accountStatus).toBe('active');
+  });
 });

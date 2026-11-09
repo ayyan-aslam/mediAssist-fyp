@@ -47,6 +47,29 @@ const profileUpdateSchemas = {
   }),
 };
 
+// The largest value of a SERIAL (INT) column.
+const MAX_ID = 2_147_483_647;
+const id = z.coerce.number().int().positive().max(MAX_ID);
+
+// GET /admin/users (design doc 5.2). Query values arrive as strings. Lists and pages: Section 5.1.2.
+const adminUserListSchema = z.object({
+  search: z.string().trim().max(150).optional().transform((value) => value || undefined),
+  role: z.enum(['patient', 'doctor', 'admin']).optional(),
+  status: z.enum(['active', 'suspended']).optional(),
+  specialtyId: id.optional(),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+// GET /internal/users?ids=15,16
+const userIdsSchema = z.object({
+  ids: z
+    .string()
+    .transform((value) => value.split(',').map((part) => part.trim()))
+    .pipe(z.array(z.string().regex(/^\d+$/, 'must be a list of user IDs').pipe(id)).min(1).max(100))
+    .transform((ids) => [...new Set(ids)]),
+});
+
 const loginSchema = z.object({ firebaseToken: z.string().min(1) });
 const refreshTokenSchema = z.object({ refreshToken: z.string().min(1) });
 
@@ -83,6 +106,23 @@ export class RequestValidator {
     return parse(refreshTokenSchema, body);
   }
 
+  validateAdminUserList(query) {
+    return parse(adminUserListSchema, query);
+  }
+
+  validateUserIds(query) {
+    return parse(userIdsSchema, query).ids;
+  }
+
+  // A user ID in the URL. A value that is not a valid ID cannot exist, so it is 404 USER_NOT_FOUND.
+  parseUserId(value) {
+    const result = id.safeParse(value);
+    if (!/^\d+$/.test(value) || !result.success) {
+      throw new AppError(404, 'USER_NOT_FOUND', 'This user was not found.');
+    }
+    return result.data;
+  }
+
   validateProfileUpdate(body, role) {
     const schema = profileUpdateSchemas[role];
     if (!schema) {
@@ -91,3 +131,6 @@ export class RequestValidator {
     return parse(schema, body);
   }
 }
+
+// scripts/create-admin.js checks ADMIN_PASSWORD with the same rules.
+export { password as passwordSchema };

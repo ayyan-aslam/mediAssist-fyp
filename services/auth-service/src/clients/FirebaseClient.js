@@ -27,6 +27,37 @@ export class FirebaseClient {
     await this.auth.deleteUser(uid);
   }
 
+  // A disabled account cannot log in by any method (design doc Diagram 11).
+  async disableUser(uid) {
+    await this.auth.updateUser(uid, { disabled: true });
+  }
+
+  async enableUser(uid) {
+    await this.auth.updateUser(uid, { disabled: false });
+  }
+
+  // Ends the Firebase sessions on every device.
+  async revokeRefreshTokens(uid) {
+    await this.auth.revokeRefreshTokens(uid);
+  }
+
+  // For scripts/create-admin.js. Returns the UID, or null when no Firebase user has this email.
+  async findUidByEmail(email) {
+    try {
+      return (await this.auth.getUserByEmail(email)).uid;
+    } catch (err) {
+      if (err.code === 'auth/user-not-found') return null;
+      throw err;
+    }
+  }
+
+  // For scripts/create-admin.js: an admin needs no verification email. Returns the UID.
+  async saveAdminUser(uid, { email, password, displayName }) {
+    const fields = { email, password, displayName, emailVerified: true, disabled: false };
+    const user = uid ? await this.auth.updateUser(uid, fields) : await this.auth.createUser(fields);
+    return user.uid;
+  }
+
   // Throws when the token is not valid or has expired.
   async verifyIdToken(idToken) {
     const decoded = await this.auth.verifyIdToken(idToken);

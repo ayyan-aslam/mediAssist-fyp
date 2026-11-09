@@ -10,7 +10,8 @@
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "create-admin": "node --env-file-if-exists=../../.env scripts/create-admin.js"
   },
   "dependencies": {
     "@mediassist/common": "^0.1.0",

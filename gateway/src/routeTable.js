@@ -4,6 +4,7 @@
 export const PUBLIC = 'public';
 
 const DOCTOR = ['doctor'];
+const ADMIN = ['admin'];
 
 export const ROUTES = [
   // Auth & User Service (Section 5.2)
@@ -15,6 +16,10 @@ export const ROUTES = [
   { method: 'GET', path: '/users/me', service: 'auth', roles: ['patient', 'doctor', 'admin'] },
   { method: 'PATCH', path: '/users/me', service: 'auth', roles: ['patient', 'doctor'] },
   { method: 'GET', path: '/specialties', service: 'auth', roles: PUBLIC },
+  { method: 'GET', path: '/admin/users', service: 'auth', roles: ADMIN },
+  { method: 'GET', path: '/admin/users/:userId', service: 'auth', roles: ADMIN },
+  { method: 'POST', path: '/admin/users/:userId/suspend', service: 'auth', roles: ADMIN },
+  { method: 'POST', path: '/admin/users/:userId/activate', service: 'auth', roles: ADMIN },
 
   // Consultation Service (Section 5.5)
   { method: 'POST', path: '/clinical-patients', service: 'consultation', roles: DOCTOR },
