@@ -19,6 +19,7 @@ function fakeChannel({ confirm = null } = {}) {
     assertExchange: vi.fn(async () => {}),
     assertQueue: vi.fn(async () => {}),
     bindQueue: vi.fn(async () => {}),
+    deleteQueue: vi.fn(async () => {}),
     prefetch: vi.fn(async () => {}),
     consume: vi.fn(async (queue, onMessage) => {
       channel.onMessage = onMessage;
@@ -110,6 +111,16 @@ describe('setupTopology', () => {
     for (const { name, routingKeys } of QUEUES.filter((queue) => queue.name !== 'gateway.user.status')) {
       expect(name.endsWith(`.${routingKeys[0]}`)).toBe(true);
     }
+  });
+
+  it('deletes the removed soap.ready queue with its retry and dead-letter queue', async () => {
+    const model = fakeModel();
+    await setupTopology(model);
+    expect(model.channel.deleteQueue.mock.calls).toEqual([
+      ['prescription.soap.ready'],
+      ['prescription.soap.ready.retry'],
+      ['prescription.soap.ready.dlq'],
+    ]);
   });
 
   it('declares the same settings when it runs again', async () => {

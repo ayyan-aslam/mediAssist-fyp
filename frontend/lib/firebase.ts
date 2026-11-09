@@ -117,7 +117,7 @@ const FIREBASE_MESSAGES: Record<string, string> = {
   "auth/wrong-password": "The email or password is not correct. Please try again.",
   "auth/user-not-found": "The email or password is not correct. Please try again.",
   "auth/invalid-email": "Please enter a valid email address.",
-  "auth/user-disabled": "Your account is suspended. Please contact support.",
+  "auth/user-disabled": "Your account has been suspended. Please contact the administrator.",
   "auth/too-many-requests": "Too many attempts. Please wait a few minutes and try again.",
   "auth/network-request-failed": "Cannot reach the server. Check your internet connection and try again.",
   "auth/expired-action-code": "This link has expired. Please ask for a new one.",

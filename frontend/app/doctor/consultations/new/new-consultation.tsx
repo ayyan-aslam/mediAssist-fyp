@@ -242,7 +242,7 @@ function SavedPatient({ patient }: { patient: ClinicalPatient }) {
                   {patient.email}
                 </span>
               ) : (
-                <span className="opacity-80">No email. The prescription can be sent by WhatsApp only.</span>
+                <span className="opacity-80">No email. Add one to send the prescription and reminders by email.</span>
               )}
             </p>
           </div>

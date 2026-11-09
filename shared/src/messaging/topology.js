@@ -23,6 +23,10 @@ export const QUEUES = [
   { name: 'audit.audit.event', routingKeys: ['audit.event'] },
 ];
 
+// Queues of messages that were removed from the design (soap.ready, design doc 6.4.6).
+// setupTopology deletes them with their retry and dead-letter queues, so older setups lose them too.
+const REMOVED_QUEUES =['prescription.soap.ready'];
+
 export const retryQueue = (queue) => `${queue}.retry`;
 export const deadLetterQueue = (queue) => `${queue}.dlq`;
 
@@ -53,6 +57,13 @@ export async function setupTopology(model) {
 
       for (const routingKey of routingKeys) {
         await channel.bindQueue(name, EXCHANGE, routingKey);
+      }
+    }
+
+    // Deleting a queue that does not exist is fine in RabbitMQ.
+    for (const name of REMOVED_QUEUES) {
+      for (const queue of [name, retryQueue(name), deadLetterQueue(name)]) {
+        await channel.deleteQueue(queue);
       }
     }
   } finally {

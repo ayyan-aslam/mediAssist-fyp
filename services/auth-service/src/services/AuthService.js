@@ -15,7 +15,7 @@ function invalidFirebaseTokenError(message = 'Your login could not be verified. 
 }
 
 function accountSuspendedError() {
-  return new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account is suspended. Please contact support.');
+  return new AppError(403, 'ACCOUNT_SUSPENDED', 'Your account has been suspended. Please contact the administrator.');
 }
 
 // Sign-up, login, refresh and logout logic: design doc Sections 7.3 and 7.4.

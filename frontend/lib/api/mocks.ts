@@ -246,7 +246,7 @@ function registerDoctor(body: Record<string, unknown>): [number, unknown?] {
 function login(body: Record<string, unknown>): [number, unknown?] {
   const email = String(body.firebaseToken ?? "").replace(/^mock:/, "");
   if (email === "unverified@example.com") return error(403, "EMAIL_NOT_VERIFIED", "Please verify your email before logging in.");
-  if (email === "suspended@example.com") return error(403, "ACCOUNT_SUSPENDED", "Your account is suspended. Please contact support.");
+  if (email === "suspended@example.com") return error(403, "ACCOUNT_SUSPENDED", "Your account has been suspended. Please contact the administrator.");
   return [
     200,
     {
