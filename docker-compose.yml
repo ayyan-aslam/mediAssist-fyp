@@ -169,6 +169,44 @@ services:
       retries: 5
       start_period: 30s
 
+  # Audit Service. Starts only with the services profile, like the Consultation Service above
+  # (in daily work it runs on the host with npm run dev, on the same port).
+  audit-service:
+    profiles: ["services"]
+    build:
+      context: .
+      dockerfile: services/audit-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      # Same logins as in .env, but the hosts are the Docker service names.
+      # The migrations run as audit_owner; the service runs as audit_service (SELECT and INSERT only).
+      AUDIT_DATABASE_URL: postgresql://audit_service:${AUDIT_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=auditdb
+      AUDIT_MIGRATION_DATABASE_URL: postgresql://audit_owner:${AUDIT_OWNER_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=auditdb
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      # The Auth & User Service runs on the host (npm run dev).
+      AUTH_SERVICE_URL: http://host.docker.internal:${AUTH_SERVICE_PORT:-3001}
+      AUDIT_SERVICE_PORT: 3005
+      AUDIT_TIMEZONE: ${AUDIT_TIMEZONE:-Asia/Karachi}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:${AUDIT_SERVICE_PORT:-3005}:3005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      # It reads its queue, which the Consultation Service creates.
+      consultation-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3005/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # AI Pipeline (agent/). Starts only with the services profile, like the Consultation Service above
   # (in daily work it runs on the host: python -m mediassist_agent.run --rabbitmq in agent\).
   # It only connects: until the Consultation Service has created the queues, it tries again every 5 seconds.

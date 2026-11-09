@@ -34,8 +34,10 @@ export interface ApiOptions {
 
 const NETWORK_ERROR_MESSAGE = "Cannot reach the server. Check your internet connection and try again.";
 const SESSION_ENDED_MESSAGE = "Your session has ended. Please log in again.";
+const ACCOUNT_SUSPENDED_MESSAGE = "Your account has been suspended. Please contact the administrator.";
 
-// The AuthContext sets this, so a failed refresh logs the user out and opens the login page.
+// The AuthContext sets this, so a failed refresh or a suspended account logs the user out and opens
+// the login page.
 let onSessionExpired: () => void = () => {};
 
 export function setSessionExpiredHandler(handler: () => void) {
@@ -128,14 +130,25 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
       res = await send(path, options, getAccessToken());
     }
 
-    if (!res.ok) throw await readError(res);
+    if (!res.ok) {
+      const error = await readError(res);
+      // The admin suspended the account: the API Gateway blocks the user's access token at once.
+      if (useAuth && error.status === 403 && error.code === "ACCOUNT_SUSPENDED") {
+        clearTokens();
+        toast.error(ACCOUNT_SUSPENDED_MESSAGE, { id: "account-suspended", duration: 10_000 });
+        onSessionExpired();
+        throw new ApiError(403, "ACCOUNT_SUSPENDED", ACCOUNT_SUSPENDED_MESSAGE);
+      }
+      throw error;
+    }
     if (res.status === 204) return undefined as T;
     if (options.responseType === "blob") return (await res.blob()) as T;
     return (await res.json()) as T;
   } catch (err) {
     const error =
       err instanceof ApiError ? err : new ApiError(0, "NETWORK_ERROR", NETWORK_ERROR_MESSAGE);
-    if (!options.silent && error.code !== "SESSION_ENDED") toast.error(error.message);
+    const shown = error.code === "SESSION_ENDED" || (useAuth && error.code === "ACCOUNT_SUSPENDED");
+    if (!options.silent && !shown) toast.error(error.message);
     throw error;
   }
 }

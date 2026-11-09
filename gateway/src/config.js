@@ -9,6 +9,9 @@ const envSchema = z.object({
   AUTH_SERVICE_URL: z.url(),
   CONSULTATION_SERVICE_URL: z.url(),
   PRESCRIPTION_SERVICE_URL: z.url(),
+  AUDIT_SERVICE_URL: z.url(),
+  // user.suspended and user.activated arrive in the gateway.user.status queue (design doc 6.4.10, 6.4.11).
+  RABBITMQ_URL: z.url({ protocol: /^amqps?$/ }),
   // Number of proxies (for example a load balancer) in front of the gateway, so req.ip is the real client IP.
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),

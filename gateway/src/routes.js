@@ -8,15 +8,16 @@ import { isSseRoute, PUBLIC, ROUTES } from './routeTable.js';
 
 // Mounted at /api/v1. Every route comes from the route table.
 // Public route: rate limit by IP -> proxy.
-// Logged-in route: token check -> role check -> rate limit by user -> (SSE: prepareSse) -> proxy.
-export function createRouter({ config, logger }) {
+// Logged-in route: token and block list check -> role check -> rate limit by user -> (SSE: prepareSse) -> proxy.
+export function createRouter({ config, logger, blockListStore }) {
   const router = Router();
-  const authMiddleware = new AuthMiddleware({ jwtSecret: config.JWT_SECRET });
+  const authMiddleware = new AuthMiddleware({ jwtSecret: config.JWT_SECRET, blockListStore });
   const rateLimiters = createRateLimiters(config);
   const serviceUrls = {
     auth: config.AUTH_SERVICE_URL,
     consultation: config.CONSULTATION_SERVICE_URL,
     prescription: config.PRESCRIPTION_SERVICE_URL,
+    audit: config.AUDIT_SERVICE_URL,
   };
 
   const proxies = new Map();

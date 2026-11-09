@@ -56,6 +56,9 @@ export const ROUTES = [
   { method: 'GET', path: '/prescriptions/:prescriptionId/send-options', service: 'prescription', roles: DOCTOR },
   { method: 'POST', path: '/prescriptions/:prescriptionId/send', service: 'prescription', roles: DOCTOR },
   { method: 'GET', path: '/prescriptions/:prescriptionId/deliveries', service: 'prescription', roles: DOCTOR },
+
+  // Audit Service (Section 5.10)
+  { method: 'GET', path: '/admin/audit-logs', service: 'audit', roles: ADMIN },
 ];
 
 export function isSseRoute(route) {

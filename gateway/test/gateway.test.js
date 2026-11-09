@@ -12,6 +12,7 @@ beforeAll(async () => {
     AUTH_SERVICE_URL: serviceUrl(upstream),
     CONSULTATION_SERVICE_URL: serviceUrl(upstream),
     PRESCRIPTION_SERVICE_URL: serviceUrl(upstream),
+    AUDIT_SERVICE_URL: serviceUrl(upstream),
   });
 });
 
@@ -146,6 +147,7 @@ describe('service down', () => {
       AUTH_SERVICE_URL: 'http://127.0.0.1:1',
       CONSULTATION_SERVICE_URL: 'http://127.0.0.1:1',
       PRESCRIPTION_SERVICE_URL: 'http://127.0.0.1:1',
+      AUDIT_SERVICE_URL: 'http://127.0.0.1:1',
     });
     const res = await request(downApp).get('/api/v1/specialties');
     expect(res.status).toBe(503);

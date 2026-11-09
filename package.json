@@ -17,7 +17,7 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "concurrently --names gateway,auth,consultation,prescription,notification --prefix-colors cyan,magenta,green,yellow,blue \"npm run dev -w gateway\" \"npm run dev -w services/auth-service\" \"npm run dev -w services/consultation-service\" \"npm run dev -w services/prescription-service\" \"npm run dev -w services/notification-service\"",
+    "dev": "concurrently --names gateway,auth,consultation,prescription,notification,audit --prefix-colors cyan,magenta,green,yellow,blue,red \"npm run dev -w gateway\" \"npm run dev -w services/auth-service\" \"npm run dev -w services/consultation-service\" \"npm run dev -w services/prescription-service\" \"npm run dev -w services/notification-service\" \"npm run dev -w services/audit-service\"",
     "test": "npm test --workspaces --if-present",
     "lint": "eslint ."
   },

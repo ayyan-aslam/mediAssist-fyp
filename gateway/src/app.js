@@ -6,7 +6,8 @@ import { stripUserHeaders } from './middleware/stripUserHeaders.js';
 import { createRouter } from './routes.js';
 
 // No express.json() here: the gateway passes the request body to the service as it is.
-export function createApp({ config, logger }) {
+// blockListStore: the suspended users (design doc 3.3), filled by the GatewayEventConsumer.
+export function createApp({ config, logger, blockListStore }) {
   const app = express();
   app.set('trust proxy', config.TRUST_PROXY_HOPS);
 
@@ -17,7 +18,7 @@ export function createApp({ config, logger }) {
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
   });
-  app.use('/api/v1', createRouter({ config, logger }));
+  app.use('/api/v1', createRouter({ config, logger, blockListStore }));
 
   app.use(() => {
     throw new AppError(404, 'ROUTE_NOT_FOUND', 'This route does not exist.');

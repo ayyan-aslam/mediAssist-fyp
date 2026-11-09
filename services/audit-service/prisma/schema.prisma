@@ -1,0 +1,30 @@
+// AuditDB table: design doc Section 4.4.8.
+// The check constraint (Section 4.6) and the grants are added as raw SQL in the migration, because Prisma
+// cannot model them. The indexes (Section 4.9) are listed here too, so later migrations do not drop them.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Rows are only inserted and read. The runtime login (audit_service) has no UPDATE or DELETE right.
+model AuditLog {
+  logId     BigInt   @id @default(autoincrement()) @map("log_id")
+  // The messageId of the audit.event message (design doc 6.4.12), so one action is never logged twice.
+  messageId String   @unique @map("message_id") @db.Uuid
+  // Logical reference to USERS in UserDB.
+  userId    Int      @map("user_id")
+  action    String   @db.VarChar(40)
+  details   String?  @db.VarChar(255)
+  ipAddress String   @map("ip_address") @db.VarChar(45)
+  // The time of the action (occurredAt of the message), in UTC.
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  @@index([createdAt], map: "audit_log_created_at_idx")
+  @@index([userId], map: "audit_log_user_id_idx")
+  @@map("audit_log")
+}

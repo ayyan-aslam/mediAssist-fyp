@@ -68,7 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // A refresh failed inside the API client: log out and go to the login page (and back here after login).
+  // A refresh failed or the account was suspended (403 ACCOUNT_SUSPENDED) inside the API client:
+  // log out and go to the login page (and back here after login).
   useEffect(() => {
     setSessionExpiredHandler(() => {
       endSession();

@@ -2,6 +2,7 @@ import { createLogger } from '@mediassist/common';
 import express from 'express';
 import { SignJWT } from 'jose';
 import { createApp } from '../src/app.js';
+import { BlockListStore } from '../src/BlockListStore.js';
 
 export const JWT_SECRET = 'test-secret-that-is-at-least-32-characters';
 
@@ -33,7 +34,7 @@ export function serviceUrl(server) {
   return `http://127.0.0.1:${server.address().port}`;
 }
 
-export function buildApp(config) {
+export function buildApp(config, { blockListStore = new BlockListStore() } = {}) {
   return createApp({
     config: {
       JWT_SECRET,
@@ -45,5 +46,6 @@ export function buildApp(config) {
       ...config,
     },
     logger: createLogger('test', 'silent'),
+    blockListStore,
   });
 }

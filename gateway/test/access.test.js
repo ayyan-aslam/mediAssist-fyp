@@ -6,16 +6,19 @@ import { admin, buildApp, doctor, patient, serviceUrl, signToken, startEchoServi
 let authService;
 let consultationService;
 let prescriptionService;
+let auditService;
 let services;
 
 beforeAll(async () => {
   authService = await startEchoService('auth');
   consultationService = await startEchoService('consultation');
   prescriptionService = await startEchoService('prescription');
+  auditService = await startEchoService('audit');
   services = {
     AUTH_SERVICE_URL: serviceUrl(authService),
     CONSULTATION_SERVICE_URL: serviceUrl(consultationService),
     PRESCRIPTION_SERVICE_URL: serviceUrl(prescriptionService),
+    AUDIT_SERVICE_URL: serviceUrl(auditService),
   };
 });
 
@@ -23,6 +26,7 @@ afterAll(() => {
   authService.close();
   consultationService.close();
   prescriptionService.close();
+  auditService.close();
 });
 
 const bearer = async (user) => `Bearer ${await signToken(user)}`;
@@ -91,13 +95,14 @@ describe('admin routes', () => {
   // Every /admin route in the table: an admin gets through, a doctor and a patient do not.
   const adminRoutes = ROUTES.filter((route) => route.path.startsWith('/admin/'));
 
-  it('has the four admin user routes of design doc 5.2', () => {
+  it('has the four admin user routes of design doc 5.2 and the audit log route of 5.10', () => {
     expect(adminRoutes.map((route) => `${route.method} ${route.path}`)).toEqual(
       expect.arrayContaining([
         'GET /admin/users',
         'GET /admin/users/:userId',
         'POST /admin/users/:userId/suspend',
         'POST /admin/users/:userId/activate',
+        'GET /admin/audit-logs',
       ]),
     );
   });

@@ -10,11 +10,14 @@ function readBearerToken(req) {
   return scheme === 'Bearer' && token ? token : null;
 }
 
-// Checks the access token (JWT, HS256) made by the Auth & User Service.
-// On success it sets req.user = { userId, role, name, email }.
+const SUSPENDED_MESSAGE = 'Your account has been suspended. Please contact the administrator.';
+
+// Checks the access token (JWT, HS256) made by the Auth & User Service, and asks BlockListStore whether
+// the user is suspended (design doc Diagram 11). On success it sets req.user = { userId, role, name, email }.
 export class AuthMiddleware {
-  constructor({ jwtSecret }) {
+  constructor({ jwtSecret, blockListStore }) {
     this.key = new TextEncoder().encode(jwtSecret);
+    this.blockListStore = blockListStore;
   }
 
   authenticate = async (req, res, next) => {
@@ -48,6 +51,10 @@ export class AuthMiddleware {
     const { userId, role, name, email } = payload;
     if (!userId || !role) {
       throw unauthorized('The access token is not valid.');
+    }
+    // The token is still valid, but the account was suspended after it was made.
+    if (this.blockListStore.isBlocked(userId)) {
+      throw new AppError(403, 'ACCOUNT_SUSPENDED', SUSPENDED_MESSAGE);
     }
     return { userId, role, name, email };
   }
