@@ -98,7 +98,11 @@ services:
     build:
       context: ./agent
     restart: unless-stopped
-    env_file: .env
+    # Shared secrets from the root .env; the agent's own settings (AGENT_*) only from agent/.env.
+    env_file:
+      - .env
+      - path: agent/.env
+        required: false
     environment:
       # Same logins as in .env, but the hosts are the Docker service names.
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672

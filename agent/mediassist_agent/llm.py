@@ -16,12 +16,19 @@ log = logging.getLogger("mediassist_agent")
 _NO_TEMPERATURE: set[str] = set()  # models that rejected a temperature setting at runtime
 
 
+def _required(value: str | None, name: str) -> str:
+    if not value:
+        raise RuntimeError(f"{name} is not set. Set it in agent/.env (copy agent/.env.example).")
+    return value
+
+
 @lru_cache(maxsize=4)
 def chat_model(send_temperature: bool = True):
     from langchain_openai import ChatOpenAI
 
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not set (root .env).")
+    _required(settings.llm_model, "AGENT_LLM_MODEL")
     kwargs = {}
     # Low temperature = deterministic, conservative extraction. Some reasoning models (gpt-5.x / o-series)
     # only accept their default; if the API rejects it we fall back automatically (see extract()).
@@ -37,7 +44,9 @@ def embeddings_model():
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not set (root .env).")
     return OpenAIEmbeddings(
-        model=settings.embedding_model, dimensions=settings.embedding_dim, api_key=settings.openai_api_key
+        model=_required(settings.embedding_model, "AGENT_EMBEDDING_MODEL"),
+        dimensions=settings.embedding_dim,
+        api_key=settings.openai_api_key,
     )
 
 
