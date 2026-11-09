@@ -9,6 +9,7 @@ import {
   DeliveryPreview,
   LabValuePreview,
   MedicineMatchPreview,
+  RecordingBadge,
   SeverityPreview,
 } from "@/components/shared/product-previews";
 import { Reveal } from "@/components/shared/reveal";
@@ -190,19 +191,21 @@ export default function LandingPage() {
             </ul>
           </Reveal>
 
-          <Reveal delay={0.1} className="relative lg:pb-10">
-            <div className="rounded-[2rem] bg-mint p-3 sm:p-4">
+          <Reveal delay={0.1} className="relative lg:pb-8">
+            <div className="relative rounded-[2rem] bg-mint p-3 sm:p-4">
               <Image
                 src={consultation}
                 alt="A doctor listening to a patient at a clinic desk"
                 priority
                 placeholder="blur"
                 sizes="(min-width: 1024px) 600px, 100vw"
-                className="aspect-[4/3] w-full rounded-[1.5rem] object-cover"
+                className="aspect-[4/3] w-full rounded-[1.5rem] object-cover object-[45%_30%]"
               />
+              <RecordingBadge className="absolute top-7 left-7 sm:top-8 sm:left-8" />
             </div>
-            <div className="relative -mt-20 px-4 sm:px-10 lg:absolute lg:bottom-0 lg:-left-6 lg:mt-0 lg:w-[22rem] lg:px-0 xl:-left-10">
-              <ConsultationPreview variant="panel" />
+            {/* Small card over the desk corner of the photo, so the doctor and the patient stay visible. */}
+            <div className="relative -mt-14 px-6 sm:px-10 lg:absolute lg:bottom-0 lg:-left-8 lg:mt-0 lg:w-[19rem] lg:px-0 xl:-left-12">
+              <ConsultationPreview variant="compact" />
             </div>
           </Reveal>
         </section>

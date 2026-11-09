@@ -151,8 +151,69 @@ function PatientBar() {
   );
 }
 
-// The consultation screen: transcript and SOAP note. "panel" shows only the SOAP note card (auth panel).
-export function ConsultationPreview({ className, variant = "full" }: { className?: string; variant?: "full" | "panel" }) {
+// A small floating card for photos: the note is ready, with the diagnosis and the matched medicine.
+function NoteReadyCard({ className }: { className?: string }) {
+  return (
+    <div aria-hidden="true" className={cn("rounded-2xl bg-card/95 p-4 text-card-foreground shadow-lift ring-1 ring-black/5 backdrop-blur-md", className)}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sky text-[11px] font-bold text-sky-foreground">
+            AR
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">Ahmed Raza</p>
+            <p className="truncate text-[11px] text-muted-foreground">SOAP note</p>
+          </div>
+        </div>
+        <Chip tone="green">
+          <Check className="size-3" strokeWidth={3} />
+          Ready in 12 s
+        </Chip>
+      </div>
+      <div style={appearDelay(0)} className={cn(APPEAR, "mt-3 flex items-baseline gap-2 text-sm")}>
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-peach text-[10px] font-bold text-peach-foreground">
+          A
+        </span>
+        <span className="min-w-0 truncate">Acute pharyngitis</span>
+      </div>
+      <div style={appearDelay(1)} className={cn(APPEAR, "mt-2.5 flex items-center justify-between gap-2 rounded-xl bg-muted px-3 py-2")}>
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-semibold">Paracetamol 500 mg</p>
+          <p className="truncate text-[11px] text-muted-foreground">3 times a day · 5 days</p>
+        </div>
+        <Chip tone="green">Matched</Chip>
+      </div>
+    </div>
+  );
+}
+
+// "Recording" badge with a moving sound wave, for the top of a photo.
+export function RecordingBadge({ className }: { className?: string }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn("inline-flex items-center gap-2.5 rounded-full bg-navy/80 py-1.5 pr-3.5 pl-2.5 text-navy-foreground shadow-soft backdrop-blur-md", className)}
+    >
+      <span className="relative flex size-2.5">
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-rec opacity-60 motion-reduce:hidden" />
+        <span className="relative inline-flex size-2.5 rounded-full bg-rec" />
+      </span>
+      <span className="text-xs font-semibold tabular-nums">Recording 12:48</span>
+      <Waveform className="h-4 [&>span]:bg-brand-bright [&>span:nth-child(n+13)]:hidden" />
+    </div>
+  );
+}
+
+// The consultation screen: transcript and SOAP note. "panel" shows only the SOAP note card; "compact" is the
+// small card that floats over a photo (home page and auth panel).
+export function ConsultationPreview({
+  className,
+  variant = "full",
+}: {
+  className?: string;
+  variant?: "full" | "panel" | "compact";
+}) {
+  if (variant === "compact") return <NoteReadyCard className={className} />;
   if (variant === "panel") {
     return (
       <div aria-hidden="true" className={cn("overflow-hidden rounded-2xl bg-card text-card-foreground shadow-lift", className)}>
