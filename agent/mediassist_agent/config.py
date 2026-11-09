@@ -1,9 +1,9 @@
 """Settings for the MediAssist agent.
 
-Values are read from the project's root .env (one level above agent/) and,
-if present, from agent/.env. Every agent-specific setting has a default, so
-the only values you must have are OPENAI_API_KEY and, for Node 1's RAG,
-MEDICINE_AI_DATABASE_URL. Both already exist in the root .env.
+agent/.env is the one place the agent settings (AGENT_*) are set; copy agent/.env.example to start.
+The shared secrets (OPENAI_API_KEY, MEDICINE_AI_DATABASE_URL, RABBITMQ_URL) are read from the
+project's root .env. The models (AGENT_LLM_MODEL, AGENT_EMBEDDING_MODEL) have no default here, so
+they are never defined twice; the other AGENT_* settings fall back to the defaults below.
 """
 from __future__ import annotations
 
@@ -48,11 +48,11 @@ def _path(name: str, default: Path) -> Path:
 
 @dataclass(frozen=True)
 class Settings:
-    # LLM + embeddings (OpenAI)
+    # LLM + embeddings (OpenAI). The models come only from agent/.env (no default, see the docstring).
     openai_api_key: str | None = field(default_factory=lambda: _env("OPENAI_API_KEY"))
-    llm_model: str = field(default_factory=lambda: _env("AGENT_LLM_MODEL", "gpt-6-luna"))
+    llm_model: str | None = field(default_factory=lambda: _env("AGENT_LLM_MODEL"))
     llm_temperature: float = field(default_factory=lambda: float(_env("AGENT_LLM_TEMPERATURE", "0")))
-    embedding_model: str = field(default_factory=lambda: _env("AGENT_EMBEDDING_MODEL", "text-embedding-3-small"))
+    embedding_model: str | None = field(default_factory=lambda: _env("AGENT_EMBEDDING_MODEL"))
     # medicinedb uses VECTOR(768) (docker/postgres/init.sql), so embeddings are requested at 768 dims.
     embedding_dim: int = field(default_factory=lambda: int(_env("AGENT_EMBEDDING_DIM", "768")))
 
