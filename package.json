@@ -17,7 +17,7 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "concurrently --names gateway,auth,consultation,prescription --prefix-colors cyan,magenta,green,yellow \"npm run dev -w gateway\" \"npm run dev -w services/auth-service\" \"npm run dev -w services/consultation-service\" \"npm run dev -w services/prescription-service\"",
+    "dev": "concurrently --names gateway,auth,consultation,prescription,notification --prefix-colors cyan,magenta,green,yellow,blue \"npm run dev -w gateway\" \"npm run dev -w services/auth-service\" \"npm run dev -w services/consultation-service\" \"npm run dev -w services/prescription-service\" \"npm run dev -w services/notification-service\"",
     "test": "npm test --workspaces --if-present",
     "lint": "eslint ."
   },
@@ -28,8 +28,8 @@
     "globals": "^17.14.0"
   },
   "allowScripts": {
-    "prisma@7.10.0": true,
-    "@prisma/engines@7.10.0": true,
+    "prisma@7.10.1": true,
+    "@prisma/engines@7.10.1": true,
     "@firebase/util@1.15.3": true,
     "protobufjs@7.6.6": true,
     "unrs-resolver@1.12.2": true

@@ -1,0 +1,60 @@
+// NotificationDB tables: design doc Section 4.4.7.
+// Check constraints (Section 4.6) are added as raw SQL in the migration, because Prisma cannot model them.
+// The indexes (Section 4.9) are listed here too, so later migrations do not drop them.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model PrescriptionDelivery {
+  deliveryId     Int      @id @default(autoincrement()) @map("delivery_id")
+  // The messageId of the prescription.send message (design doc 6.4.7), so a request is never sent twice.
+  messageId      String   @unique @map("message_id") @db.Uuid
+  // Logical reference to PRESCRIPTION in PrescriptionDB.
+  prescriptionId Int      @map("prescription_id")
+  channel        String   @db.VarChar(10)
+  recipient      String   @db.VarChar(150)
+  status         String   @db.VarChar(10)
+  errorMessage   String?  @map("error_message") @db.VarChar(255)
+  attemptedAt    DateTime @map("attempted_at") @db.Timestamp(6)
+
+  @@index([prescriptionId], map: "prescription_delivery_prescription_id_idx")
+  @@map("prescription_delivery")
+}
+
+// The last followup.changed handled for each consultation. changed_at ignores an older message that arrives
+// late, also after the date was removed. The date and the names are used in the reminder emails.
+model FollowUpChange {
+  // Logical reference to CONSULTATION in ConsultationDB.
+  consultationId Int       @id @map("consultation_id")
+  followUpDate   DateTime? @map("follow_up_date") @db.Date
+  doctorName     String    @map("doctor_name") @db.VarChar(100)
+  patientName    String    @map("patient_name") @db.VarChar(100)
+  changedAt      DateTime  @map("changed_at") @db.Timestamp(6)
+
+  reminders FollowUpReminder[]
+
+  @@map("follow_up_change")
+}
+
+model FollowUpReminder {
+  reminderId     Int       @id @default(autoincrement()) @map("reminder_id")
+  consultationId Int       @map("consultation_id")
+  recipientType  String    @map("recipient_type") @db.VarChar(10)
+  recipientEmail String    @map("recipient_email") @db.VarChar(150)
+  scheduledAt    DateTime  @map("scheduled_at") @db.Timestamp(6)
+  status         String    @db.VarChar(10)
+  sentAt         DateTime? @map("sent_at") @db.Timestamp(6)
+
+  change FollowUpChange @relation(fields: [consultationId], references: [consultationId])
+
+  @@index([consultationId], map: "follow_up_reminder_consultation_id_idx")
+  // Finding the reminders that are due.
+  @@index([status, scheduledAt], map: "follow_up_reminder_status_scheduled_at_idx")
+  @@map("follow_up_reminder")
+}

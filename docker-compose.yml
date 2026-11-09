@@ -126,6 +126,49 @@ services:
       retries: 5
       start_period: 30s
 
+  # Notification Service. Starts only with the services profile, like the Consultation Service above
+  # (in daily work it runs on the host with npm run dev, on the same port).
+  notification-service:
+    profiles: ["services"]
+    build:
+      context: .
+      dockerfile: services/notification-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      # Same login as in .env, but the hosts are the Docker service names.
+      NOTIFICATION_DATABASE_URL: postgresql://notification_service:${NOTIFICATION_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=notificationdb
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      NOTIFICATION_SERVICE_PORT: 3004
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      AWS_REGION: ${AWS_REGION}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SECURE: ${SMTP_SECURE}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      REMINDER_TIMEZONE: ${REMINDER_TIMEZONE:-Asia/Karachi}
+      REMINDER_HOUR: ${REMINDER_HOUR:-9}
+    ports:
+      - "127.0.0.1:${NOTIFICATION_SERVICE_PORT:-3004}:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      # It reads its queues, which the Consultation Service creates.
+      consultation-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3004/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   # AI Pipeline (agent/). Starts only with the services profile, like the Consultation Service above
   # (in daily work it runs on the host: python -m mediassist_agent.run --rabbitmq in agent\).
   # It only connects: until the Consultation Service has created the queues, it tries again every 5 seconds.
