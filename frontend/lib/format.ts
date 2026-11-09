@@ -1,10 +1,12 @@
-import type { Gender } from "@/lib/api/types";
+import type { Gender, Role } from "@/lib/api/types";
 
 export const GENDER_LABEL: Record<Gender, string> = { male: "Male", female: "Female", other: "Other" };
 
-// First and last initial of a name, for the avatar circle.
+export const ROLE_LABEL: Record<Role, string> = { patient: "Patient", doctor: "Doctor", admin: "Admin" };
+
+// First and last initial of a name, for the avatar circle. A leading "Dr" title is skipped.
 export function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
+  const parts = name.trim().replace(/^Dr\.?\s+/i, "").split(/\s+/);
   return (parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "");
 }
 
@@ -14,6 +16,22 @@ export function formatDate(value: string) {
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   const date = parts ? new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])) : new Date(value);
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+}
+
+// An ISO time as "7 Oct 2026", for table columns.
+export function formatShortDate(value: string) {
+  return new Date(value).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+// An ISO time as "7 Oct 2026, 14:41" in the browser's time zone.
+export function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 // The first non-empty line of a text, or null.

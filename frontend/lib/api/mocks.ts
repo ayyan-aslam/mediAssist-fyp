@@ -46,6 +46,16 @@ const ADMIN_USER = {
   createdAt: "2026-10-01T09:15:00Z",
 };
 
+// The example of GET /admin/audit-logs (design doc 5.10).
+const AUDIT_LOG = {
+  logId: 5012,
+  user: { userId: 16, fullName: "Dr. Sara Ahmed", role: "doctor" },
+  action: "prescription_send",
+  details: "Prescription 33 sent by WhatsApp",
+  ipAddress: "39.45.12.8",
+  createdAt: "2026-10-07T09:41:00Z",
+};
+
 const CLINICAL_PATIENTS: Record<string, unknown>[] = [
   { clinicalPatientId: 7, fullName: "Bilal Hussain", phone: "03214567890", email: null, age: 45, gender: "male", createdAt: "2026-10-07T09:00:00Z" },
 ];
@@ -445,6 +455,7 @@ const routes: [string, RegExp, Handler][] = [
   ["GET", /^\/admin\/users\/(\d+)$/, () => [200, ADMIN_USER]],
   ["POST", /^\/admin\/users\/(\d+)\/suspend$/, (_, [id]) => [200, { userId: Number(id), accountStatus: "suspended" }]],
   ["POST", /^\/admin\/users\/(\d+)\/activate$/, (_, [id]) => [200, { userId: Number(id), accountStatus: "active" }]],
+  ["GET", /^\/admin\/audit-logs$/, () => [200, { items: [AUDIT_LOG], page: 1, pageSize: 20, total: 1 }]],
 ];
 
 const DELAY_MS = 400;

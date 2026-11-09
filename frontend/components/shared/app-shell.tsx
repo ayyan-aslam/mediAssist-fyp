@@ -12,7 +12,7 @@ import { UserMenu } from "@/components/shared/user-menu";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
-const AREA_LABEL: Record<Area, string> = { doctor: "Doctor" };
+const AREA_LABEL: Record<Area, string> = { doctor: "Doctor", admin: "Admin" };
 
 // Header, side menu and content area. Below the lg breakpoint (phones and tablets)
 // the side menu becomes a slide-in drawer.
@@ -21,7 +21,7 @@ export function AppShell({ area, children }: { area: Area; children: React.React
   const pathname = usePathname();
   const nav = navByArea[area];
   const homeHref = nav[0].href;
-  const current = nav.find((item) => isNavActive(nav, item.href, pathname));
+  const current = nav.find((item) => isNavActive(item, pathname));
 
   return (
     <div className="min-h-dvh bg-background">

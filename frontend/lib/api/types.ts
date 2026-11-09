@@ -351,3 +351,45 @@ export interface Delivery {
   requestedAt: string;
   completedAt: string | null;
 }
+
+// Auth & User Service admin endpoints (design doc Section 5.2).
+
+export type AccountStatus = "active" | "suspended";
+
+// GET /admin/users and GET /admin/users/{userId}. specialty is null for patients and admins.
+export interface AdminUser {
+  userId: number;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  role: Role;
+  accountStatus: AccountStatus;
+  specialty: Specialty | null;
+  createdAt: string;
+}
+
+// POST /admin/users/{userId}/suspend and /activate
+export interface AccountStatusResponse {
+  userId: number;
+  accountStatus: AccountStatus;
+}
+
+// Audit Service (design doc Section 5.10). AUDIT_LOG.action values: design doc 4.6.
+
+export type AuditAction =
+  | "login"
+  | "logout"
+  | "document_upload"
+  | "soap_note_change"
+  | "prescription_send"
+  | "account_suspension";
+
+// GET /admin/audit-logs. fullName and role are null for a user the Auth & User Service does not know.
+export interface AuditLog {
+  logId: number;
+  user: { userId: number; fullName: string | null; role: Role | null };
+  action: AuditAction;
+  details: string | null;
+  ipAddress: string;
+  createdAt: string;
+}

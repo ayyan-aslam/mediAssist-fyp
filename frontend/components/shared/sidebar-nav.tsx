@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
 
 const itemClass = "flex h-11 items-center gap-3 rounded-lg px-3 text-[0.9375rem] font-medium transition-colors";
 
-// The area home (first item) is active only on its exact path.
-export function isNavActive(items: NavItem[], href: string, pathname: string) {
-  return href === items[0].href ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+// An item is active on its own path and the pages below it; an exact item only on its own path.
+export function isNavActive({ href, exact }: NavItem, pathname: string) {
+  return pathname === href || (!exact && pathname.startsWith(`${href}/`));
 }
 
 export function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
@@ -18,7 +18,8 @@ export function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate
   return (
     <nav aria-label="Main menu" className="space-y-1">
       <p className="px-3 pb-2 text-xs font-semibold text-muted-foreground">Workspace</p>
-      {items.map(({ href, label, icon: Icon, soon }) => {
+      {items.map((item) => {
+        const { href, label, icon: Icon, soon } = item;
         if (soon) {
           return (
             <span key={href} aria-disabled="true" className={cn(itemClass, "cursor-not-allowed text-muted-foreground")}>
@@ -28,7 +29,7 @@ export function SidebarNav({ items, onNavigate }: { items: NavItem[]; onNavigate
             </span>
           );
         }
-        const active = isNavActive(items, href, pathname);
+        const active = isNavActive(item, pathname);
         return (
           <Link
             key={href}
