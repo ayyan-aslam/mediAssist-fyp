@@ -53,3 +53,5 @@ agent/outbox/*.json
 
 # Generated test audio (TTS consultations for transcription tests)
 test-audio/
+
+presentation

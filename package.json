@@ -18,6 +18,8 @@
   ],
   "scripts": {
     "dev": "concurrently --names gateway,auth,consultation,prescription,notification,audit --prefix-colors cyan,magenta,green,yellow,blue,red \"npm run dev -w gateway\" \"npm run dev -w services/auth-service\" \"npm run dev -w services/consultation-service\" \"npm run dev -w services/prescription-service\" \"npm run dev -w services/notification-service\" \"npm run dev -w services/audit-service\"",
+    "start:all": "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/start-all.ps1",
+    "serve:all": "concurrently --names gateway,auth,consultation,prescription,notification,audit,web,agent --prefix-colors cyan,magenta,green,yellow,blue,red,white,gray \"npm start -w gateway\" \"npm start -w services/auth-service\" \"npm start -w services/consultation-service\" \"npm start -w services/prescription-service\" \"npm start -w services/notification-service\" \"npm start -w services/audit-service\" \"npm run dev -w frontend\" \"cd agent && .venv\\Scripts\\python.exe -m mediassist_agent.run --rabbitmq\"",
     "test": "npm test --workspaces --if-present",
     "lint": "eslint ."
   },
